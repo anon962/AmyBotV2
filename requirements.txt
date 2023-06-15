@@ -1,0 +1,12 @@
+aiohttp
+bs4
+discord.py
+fastapi
+hachiko
+loguru
+lxml
+tomlkit
+uvicorn
+yarl
+
+pytest

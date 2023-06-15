@@ -1,0 +1,14 @@
+src/config/default_perms.toml
+src/config/discord_config.toml
+src/config/secrets.toml
+
+src/data/cache/
+src/data/perms/*.toml
+venv/
+
+*.invalid
+*.log
+*.log.gz
+*.pyc
+*.sqlite
+*.fuse*

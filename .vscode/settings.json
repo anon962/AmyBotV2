@@ -1,0 +1,11 @@
+{
+  "python.formatting.provider": "black",
+  "editor.formatOnType": true,
+  "python.analysis.typeCheckingMode": "basic",
+  "autoDocstring.docstringFormat": "google-notypes",
+  "python.testing.pytestArgs": ["src"],
+  "python.testing.unittestEnabled": false,
+  "python.testing.pytestEnabled": true,
+  // ??? - https://github.com/microsoft/pylance-release/issues/3579
+  "python.analysis.autoImportCompletions": true
+}
