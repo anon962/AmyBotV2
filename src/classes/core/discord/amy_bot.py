@@ -20,12 +20,14 @@ logger = logger.bind(tags=["discord_bot"])
 
 
 class AmyBot(commands.Bot):
-    secrets: TOMLDocument = None  # type: ignore
-    config: TOMLDocument = None  # type: ignore
+    secrets: TOMLDocument
+    config: TOMLDocument
     api_url: URL
 
     perms_service: PermissionsService
-    watcher_cog: WatcherCog = None  # type: ignore
+    watcher_cog: WatcherCog
+
+    _is_loaded = False
 
     def run(self):
         secrets = load_toml(paths.SECRETS_FILE)
@@ -38,6 +40,10 @@ class AmyBot(commands.Bot):
         super().__init__("fake_prefix", *args, intents=intents, **kwargs)
 
     async def on_ready(self):
+        if self._is_loaded:
+            return
+        self._is_loaded = True
+
         self.perms_service = PermissionsService()
 
         self.init_secrets()
