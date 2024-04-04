@@ -168,6 +168,8 @@ Everything after the equip name ("peerless staff") is optional
         def parse(
             text: str,
         ) -> tuple[types._Equip.FetchParams, types._Equip.FormatOptions]:
+            text = text.replace("*", " ")
+
             # Pair dict key with prefix / extractor / converter
             parsers: list[
                 tuple[

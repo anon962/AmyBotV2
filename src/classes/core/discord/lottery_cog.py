@@ -43,6 +43,8 @@ Everything after the equip name ("peerless staff") is optional
         params: types.FetchParams = dict()  # type: ignore
         rem = msg
 
+        rem = rem.replace("*", " ")
+
         rem, raw = YearKey.extract(rem)
         if raw is not None:
             params["min_date"] = YearKey.convert(raw)
@@ -156,6 +158,8 @@ Everything after the username ("프레이") is optional
         # Parse
         params: types.FetchParams = dict()  # type: ignore
         rem = msg
+
+        rem = rem.replace("*", " ")
 
         rem, raw = YearKey.extract(rem)
         if raw is not None:
