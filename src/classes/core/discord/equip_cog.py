@@ -116,6 +116,14 @@ class EquipCog(commands.Cog):
         name="equip",
         aliases=alias_by_prefix("equip", starting_at=2),
         extras=dict(id="equip"),
+        brief="Search auction history for equip prices",
+        description="""
+Example usage: !eq peerless staff 2021 min500k max10m seller buyer link thread
+
+Everything after the equip name ("peerless staff") is optional
+
+---
+""".strip(),
     )
     @commands.check(check_perms("equip"))
     async def text_equip(self, ctx: Context, *, msg: str):
@@ -537,7 +545,9 @@ class EquipCog(commands.Cog):
             return result
 
         return await main()
-
+    
+    def __hash__(self) -> int:
+        return self.__class__.__name__.__hash__()
 
 async def _fetch_equips(
     api_url: URL,
@@ -631,7 +641,6 @@ def _fmt_stats(stats: list[str]) -> str:
     text = ", ".join(simplified[:3])
     clipped = clip(text, 18, "..")
     return clipped
-
 
 def _fmt_date(ts, title):
     title_str = "#" + title[:4]

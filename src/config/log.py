@@ -15,9 +15,9 @@ def init_logger():
         logger.add(
             paths.LOG_DIR / "server.log",
             rotation="10 MB",
-            compression="gz",
+            # compression="gz",
             filter=lambda record: "server" in record["extra"].get("tags", []),
-            level="TRACE",
+            level="DEBUG",
         )
 
         logger.add(

@@ -28,6 +28,14 @@ class LotteryCog(commands.Cog):
         name="litem",
         aliases=alias_by_prefix("litem", starting_at=3),
         extras=dict(id="litem"),
+        brief="Search weapon / armor lotteries for an item",
+        description="""
+Example usage: !lit peerless staff 2021
+
+Everything after the equip name ("peerless staff") is optional
+
+---
+""".strip(),
     )
     @commands.check(check_perms("lit"))
     async def text_lottery_item(self, ctx: Context, *, msg: str):
@@ -134,6 +142,14 @@ class LotteryCog(commands.Cog):
         name="lwinner",
         aliases=alias_by_prefix("lwinner", starting_at=3),
         extras=dict(id="lwinner"),
+        brief="Search weapon / armor lotteries for a user",
+        description="""
+Example usage: !lwin 프레이 2021
+
+Everything after the username ("프레이") is optional
+
+---
+""".strip(),
     )
     @commands.check(check_perms("lwin"))
     async def text_lottery_win(self, ctx: Context, *, msg: str):
@@ -321,12 +337,14 @@ class LotteryCog(commands.Cog):
 
         def fmt_grand_prize(lottery: dict, user: str):
             if lottery["prizes"][0][1] == user:  # type: ignore
-                return "-"
+                return "<-"
             else:
                 return lottery["prizes"][0][0] or "??????????????????????"
 
         return await main()
 
+    def __hash__(self) -> int:
+        return self.__class__.__name__.__hash__()
 
 def _fmt_date(ts, title) -> str:
     title_str = "#" + title[:4]

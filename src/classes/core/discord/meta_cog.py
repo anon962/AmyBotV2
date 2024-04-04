@@ -12,7 +12,7 @@ from . import amy_bot
 class MetaCog(commands.Cog):
     bot: "amy_bot.AmyBot"
 
-    @commands.command(name="enable_slash_commands")
+    @commands.command(name="enable_slash_commands", hidden=True)
     async def enable_slash_commands(self, ctx: Context, guild_id: Optional[int]):
         guild = ctx.guild
         if guild_id:
@@ -23,7 +23,7 @@ class MetaCog(commands.Cog):
             await self.bot.tree.sync(guild=guild)
             await ctx.message.add_reaction("👍")
 
-    @commands.command(name="disable_slash_commands")
+    @commands.command(name="disable_slash_commands", hidden=True)
     async def disable_slash_commands(self, ctx: Context, guild_id: Optional[int]):
         guild = ctx.guild
         if guild_id:
@@ -33,3 +33,6 @@ class MetaCog(commands.Cog):
             self.bot.tree.clear_commands(guild=guild)
             await self.bot.tree.sync(guild=guild)
             await ctx.message.add_reaction("👍")
+
+    def __hash__(self) -> int:
+        return self.__class__.__name__.__hash__()

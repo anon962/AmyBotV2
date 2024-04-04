@@ -94,3 +94,6 @@ class WatcherCog(commands.Cog):
         for w in self.watchers:
             if w.filter_by_raw_reaction(ctx):
                 await w.on_reaction_remove(ctx)
+
+    def __hash__(self) -> int:
+        return self.__class__.__name__.__hash__()

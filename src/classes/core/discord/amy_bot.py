@@ -37,7 +37,13 @@ class AmyBot(commands.Bot):
         intents = discord.Intents.default()
         intents.message_content = True
 
-        super().__init__("fake_prefix", *args, intents=intents, **kwargs)
+        super().__init__(
+            "fake_prefix",
+            *args,
+            intents=intents,
+            description="Source at https://github.com/anon962/AmyBotV2",
+            **kwargs,
+        )
 
     async def on_ready(self):
         if self._is_loaded:
