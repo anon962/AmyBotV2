@@ -447,6 +447,11 @@ class EquipCog(commands.Cog):
             date_col = Col(header="#Auction / Date", stringify=lambda x: _fmt_date(*x))
             tbl.add_col(date_col, dates)
 
+            # ID col
+            ids = [x["key"][-4:] for x in items]
+            id_col = Col(header="ID")
+            tbl.add_col(id_col, ids)
+
             # Remove padding at edges
             tbl.cols[0].padding_left = 0
             tbl.cols[-1].padding_right = 0
