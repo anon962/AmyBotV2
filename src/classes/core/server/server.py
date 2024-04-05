@@ -4,6 +4,7 @@ from sqlite3 import Connection
 from typing import Optional
 
 from fastapi import Depends, FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import PlainTextResponse
 
 from classes.core.server import logger
@@ -17,6 +18,15 @@ from classes.db import get_db
 from utils.sql import WhereBuilder
 
 server = FastAPI()
+
+# Enable CORS
+server.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Endpoints with a gzip'd response
 GZipWrapper.endpoints = ["/export/sqlite", "/export/json"]
