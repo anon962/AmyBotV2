@@ -5,7 +5,6 @@ from datetime import datetime
 from functools import partial
 from typing import Any, Callable, Literal, Optional
 from unicodedata import name
-
 from classes.core import discord
 from classes.core.discord import types as types
 from classes.core.discord.checks import app_check_perms, check_perms
@@ -143,16 +142,24 @@ Everything after the equip name ("peerless staff") is optional
                 resp = await ctx.send(pg)
                 responses.append(resp.id)
 
+            trailers: list[str] = []
+            if self.bot.public_web_url and "No equips found." not in pages[0]:
+                trailers.append(
+                    f"[mobile version]({params_to_web_url(params, self.bot.public_web_url)})"
+                )
+
             # Save the rest for later
             if pages_save:
-                resp = await ctx.send(
-                    f"{len(pages_save)} pages omitted. Use !more to see the rest."
-                )
-                responses.append(resp.id)
+                trailers.append(
+                    f"{len(pages_save)} pages omitted. Use !more to see the rest.")
 
                 self.bot.watcher_cog.register(
                     await MoreWatcher(ctx.channel.id, self.bot, pages_save).__ainit__()
                 )
+
+            if trailers:
+                resp = await ctx.send('\n' + '\n'.join(trailers))
+                responses.append(resp.id)
 
             self.bot.watcher_cog.register(
                 await DeleteWatcher(
@@ -547,9 +554,10 @@ Everything after the equip name ("peerless staff") is optional
             return result
 
         return await main()
-    
+
     def __hash__(self) -> int:
         return self.__class__.__name__.__hash__()
+
 
 async def _fetch_equips(
     api_url: URL,
@@ -644,7 +652,38 @@ def _fmt_stats(stats: list[str]) -> str:
     clipped = clip(text, 18, "..")
     return clipped
 
+
 def _fmt_date(ts, title):
     title_str = "#" + title[:4]
     ts_str = datetime.fromtimestamp(ts).strftime("%m-%Y")
     return f"{title_str} / {ts_str}"
+
+
+def params_to_web_url(params: types._Equip.FetchParams, public_web_url: URL) -> str:
+    url = public_web_url / "equip"
+
+    if v := params.get("name"):
+        url %= {"name": ",".join(v.split())}
+
+    if v := params.get("min_date"):
+        url %= {"min_date": int(v)}
+
+    if v := params.get("min_price"):
+        url %= {"min_price": v}
+
+    if v := params.get("max_price"):
+        url %= {"max_price": v}
+
+    if v := params.get("seller"):
+        url %= {"seller": v}
+
+    if v := params.get("seller_partial"):
+        url %= {"seller_partial": v}
+
+    if v := params.get("buyer"):
+        url %= {"buyer": v}
+
+    if v := params.get("buyer_partial"):
+        url %= {"buyer_partial": v}
+
+    return str(url)

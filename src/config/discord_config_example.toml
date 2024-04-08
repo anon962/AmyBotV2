@@ -1,2 +1,6 @@
 prefix = '!'
 api_url = 'http://localhost:4545'
+
+# A link to the web version is appended to end of some bot messages
+# Can be disabled by setting this to an empty string
+public_web_url = 'https://hvdata.gisadan.dev/m/'

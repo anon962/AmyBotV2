@@ -23,6 +23,7 @@ class AmyBot(commands.Bot):
     secrets: TOMLDocument
     config: TOMLDocument
     api_url: URL
+    public_web_url: URL | None
 
     perms_service: PermissionsService
     watcher_cog: WatcherCog
@@ -129,6 +130,9 @@ class AmyBot(commands.Bot):
             self.config = doc
             self.command_prefix = data["prefix"]
             self.api_url = URL(data["api_url"])
+            self.public_web_url = (
+                URL(data["public_web_url"]) if data["public_web_url"] else None
+            )
             return True
 
         def is_valid(data: dict) -> bool:
