@@ -1,3 +1,4 @@
+import json
 import re
 from typing import cast
 
@@ -10,13 +11,36 @@ from utils.html import (
     get_children,
     get_self_text,
     get_stripped_text,
-    has_class,
     search_or_raise,
     select_one_or_raise,
 )
 from utils.misc import load_toml
 
 LOGGER = loguru.logger.bind(tags=["equip_parser"])
+
+
+def _init_hv_session():
+    secrets = load_toml(paths.SECRETS_FILE).value
+
+    session = requests.Session()
+    for k, v in secrets["HV_COOKIES"].items():
+        session.cookies.set(k, str(v))
+
+    return session
+
+
+def fetch_equip_html(eid: int, key: str, is_isekai: bool):
+    session = _init_hv_session()
+
+    if not is_isekai:
+        url = f"https://hentaiverse.org/equip/{eid}/{key}"
+    else:
+        url = f"https://hentaiverse.org/isekai/equip/{eid}/{key}"
+
+    LOGGER.info(f"Fetching {url}")
+    resp = session.get(url)
+
+    return resp
 
 
 def parse_equip_html(html: str) -> dict:
@@ -49,8 +73,15 @@ def parse_equip_html(html: str) -> dict:
     )
 
 
+def infer_equip_stats(equip: dict, ranges_override: dict | None = None):
+    percentiles = _calc_percentiles(equip, ranges_override)
+
+    return dict(
+        percentiles=percentiles,
+    )
+
+
 def _parse_name(doc: BeautifulSoup) -> tuple[str, str | None]:
-    print(doc)
     fst_el = select_one_or_raise(doc, "#showequip > div")
     snd_el = select_one_or_raise(doc, "#showequip > div:nth-child(2)")
 
@@ -300,28 +331,252 @@ def _parse_owner(soup: BeautifulSoup):
     return dict(name=name, uid=uid)
 
 
-def fetch_equip_html(eid: int, key: str, is_isekai: bool):
-    session = _init_hv_session()
-
-    if not is_isekai:
-        url = f"https://hentaiverse.org/equip/{eid}/{key}"
+# based off LPR script and wiki page: https://ehwiki.org/wiki/The_Forge#Upgrade
+def _calc_percentiles(equip: dict, ranges_override: dict | None = None):
+    if ranges_override is None:
+        ranges = json.loads(paths.RANGES_FILE.read_text())
     else:
-        url = f"https://hentaiverse.org/isekai/equip/{eid}/{key}"
+        ranges = ranges_override
 
-    LOGGER.info(f"Fetching {url}")
-    resp = session.get(url)
+    path_options = _enumerate_range_path_options_from_name(equip["name"])
 
-    return resp
+    percentiles = dict()
+
+    if equip["weapon_damage"]:
+        percentiles["weapon_damage"] = {
+            "Attack Damage": _calc_percentile(
+                ranges,
+                path_options,
+                "Attack Damage",
+                equip["weapon_damage"]["damage"]["base"],
+            ),
+        }
+
+    for cat, stats in equip["stats"].items():
+        percentiles[cat] = dict()
+
+        for st, d in stats.items():
+            if cat == "Damage Mitigations":
+                st += " MIT"
+            elif cat == "Spell Damage":
+                st += " EDB"
+            elif cat == "Proficiency":
+                st += " PROF"
+
+            percentiles[cat][st] = _calc_percentile(
+                ranges,
+                path_options,
+                st,
+                d["base"],
+            )
+
+    return percentiles
 
 
-def _init_hv_session():
-    secrets = load_toml(paths.SECRETS_FILE).value
+def _enumerate_range_path_options_from_name(name: str) -> list[dict]:
+    """
+    Equip names are structured as follows:
+        quality (prefix) (category) slot (suffix)
 
-    session = requests.Session()
-    for k, v in secrets["HV_COOKIES"].items():
-        session.cookies.set(k, str(v))
+    In the percentile range data...
+    For weapons, the path to the min / max values looks like
+        slot -> quality -> stat -> prefix + suffix
+    Armor is similar, with an additional category key
+        category -> slot -> quality -> stat -> prefix + suffix
 
-    return session
+    Since most of the name is optional, which word corresponds to which key can be ambiguous
+    For example...
+        Average Axe (of) Slaughter = quality + slot + suffix
+        Average Cotton Pants = quality + category + slot
+
+    To avoid a giant whitelist of valid words for each key, we'll just try out all combinations.
+
+    {
+        "Axe": {
+            "Legendary": {
+                "lastUpdate": 1580056121,
+                "Attack Damage": {
+                    "all | Slaughter": {
+                        "min": 67.72,
+                        "max": 75.92
+                    },
+                    "all | not!Slaughter": {
+                        "min": 53.39,
+                        "max": 59.87
+                    }
+                },
+                "Attack Accuracy": {
+                    "all | all": {
+                        "min": 11.04,
+                        "max": 12.81
+                    }
+                },
+            }
+        },
+        "Cotton": {
+            "Shoes": {
+                "Legendary": {
+                    "lastUpdate": 1580896046,
+                    "Attack Accuracy": {
+                        "all | all": {
+                            "min": 3.22,
+                            "max": 3.83
+                        }
+                    },
+                    "Magic Accuracy": {
+                        "all | all": {
+                            "min": 2.99,
+                            "max": 3.49
+                        }
+                    },
+                    ...
+                }
+            }
+        }
+        ...
+    }
+    """
+
+    # Split name into [quality, (prefix), (category), slot, (suffix)]
+    # eg Peerless Chaged Phase Cap of Surtr --> [Peerless, Charged, Phase, Cap, Surtr]
+    parts = name.split(" ")
+    parts = [p for p in parts if p not in ["of", "Of", "the", "The", "Shield", "Staff"]]
+    assert len(parts) >= 2 and len(parts) <= 5, parts
+
+    # Suffix can exist by itself but prefix always requires a suffix
+    path_options = []
+    if len(parts) == 5:
+        quality, prefix, category, slot, suffix = parts
+        path_options.append(
+            dict(
+                quality=quality,
+                prefix=prefix,
+                category=category,
+                slot=slot,
+                suffix=suffix,
+            )
+        )
+    elif len(parts) == 4:
+        quality, a, b, c = parts
+        path_options.append(
+            dict(quality=quality, prefix=a, category=None, slot=b, suffix=c)
+        )
+        path_options.append(
+            dict(quality=quality, prefix=None, category=a, slot=b, suffix=c)
+        )
+    elif len(parts) == 3:
+        quality, a, b = parts
+        path_options.append(
+            dict(quality=quality, prefix=None, category=a, slot=b, suffix=None)
+        )
+        path_options.append(
+            dict(quality=quality, prefix=None, category=None, slot=a, suffix=b)
+        )
+    elif len(parts) == 2:
+        quality, a = parts
+        path_options.append(
+            dict(quality=quality, prefix=None, category=None, slot=a, suffix=None)
+        )
+
+    return path_options
+
+
+def _find_min_max(ranges: dict, path: dict, stat: str) -> tuple[float, float] | None:
+    def walk(d: dict, keys: list[str]):
+        v = d
+        for k in keys:
+            if k in v:
+                v = v[k]
+            else:
+                return None
+
+        return v
+
+    def is_match(req: str, value: str | None) -> bool:
+        """
+        eg
+            value   = "Slaughter"
+            req     = "Slaughter"
+            returns True
+
+            value   = "Slaughter"
+            req     = "not!Slaughter"
+            returns False
+
+            value   = "Banshee"
+            req     = "Slaughter"
+            returns False
+
+            value   = "Banshee"
+            req     = "not!Slaughter"
+            returns True
+        """
+
+        if req == "all":
+            return True
+
+        is_negative = req.startswith("not!")
+        patt = req.strip("not!")
+
+        result = patt == value
+        if is_negative:
+            result = not result
+
+        return result
+
+    # Try slot -> quality -> stat
+    d = walk(ranges, [path["slot"], path["quality"], stat])
+
+    # Try category -> slot -> quality -> stat
+    if not d and path["category"]:
+        d = walk(ranges, [path["category"], path["slot"], path["quality"], stat])
+
+    if not d:
+        return None
+
+    for req, min_max in d.items():
+        prefix_req, suffix_req = req.split(" | ")
+
+        if not is_match(prefix_req, path["prefix"]):
+            continue
+        if not is_match(suffix_req, path["suffix"]):
+            continue
+
+        return (min_max["min"], min_max["max"])
+
+    return None
+
+
+def _calc_percentile(
+    ranges: dict,
+    path_options: list[dict],
+    stat: str,
+    base_value: float,
+) -> float | None:
+    for p in path_options:
+        r = _find_min_max(ranges, p, stat)
+        if not r:
+            continue
+
+        mn, mx = r
+        if mn == mx:
+            if base_value != mn:
+                LOGGER.warning(
+                    f"Stat with zero-width range received value outside range: {stat} [{mn}, {mx}] {base_value} {p}"
+                )
+
+            return 1.0
+
+        percentile = (base_value - mn) / (mx - mn)
+        if percentile < -0.1 or percentile > 1.1:
+            LOGGER.warning(
+                f"Incorrect range for {stat}: {percentile} [{mn}, {mx}] {base_value} {p}"
+            )
+
+        print(p, stat, base_value, mn, mx)
+        return percentile
+
+    return None
 
 
 _FONT_CLASS_MAP = dict(

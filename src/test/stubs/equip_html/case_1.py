@@ -111,6 +111,35 @@ data = dict(
     ),
 )
 
+calculations = dict(
+    percentiles={
+        "weapon_damage": {
+            "Attack Damage": 0.03,
+        },
+        "misc": {
+            "Magic Damage": 0.22,
+            "Casting Speed": 0.0293,
+            "Magic Accuracy": 0.65,
+            "Magic Crit Chance": 0.59,
+            "Counter-Resist": 0.27,
+            "Burden": 1.00,
+        },
+        "Spell Damage": {
+            "Elec": 0.67,
+            "Wind": 0.67,
+            "Dark": 0.30,
+        },
+        "Proficiency": {
+            "Elemental": 0.80,
+            "Forbidden": 0.10,
+            "Deprecating": 0.28,
+        },
+        "Primary Attributes": {
+            "Intelligence": 0.58,
+            "Wisdom": 0.08,
+        },
+    },
+)
 
 html = """
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en"><head>

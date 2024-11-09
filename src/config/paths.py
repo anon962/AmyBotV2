@@ -1,6 +1,5 @@
 from pathlib import Path
 
-
 SRC_DIR = Path(__file__).parent.parent
 
 CONFIG_DIR = SRC_DIR / "config"
@@ -10,6 +9,7 @@ CACHE_DIR = DATA_DIR / "cache"
 LOG_DIR = DATA_DIR / "logs"
 PERMS_DIR = DATA_DIR / "perms"
 
+RANGES_FILE = DATA_DIR / "ranges.json"
 SECRETS_FILE = CONFIG_DIR / "secrets.toml"
 DISCORD_CONFIG = CONFIG_DIR / "discord_config.toml"
 

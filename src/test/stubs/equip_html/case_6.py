@@ -61,6 +61,24 @@ data = dict(
     ),
 )
 
+calculations = dict(
+    percentiles={
+        "weapon_damage": {
+            "Attack Damage": 0.38,
+        },
+        "misc": {
+            "Attack Accuracy": 0.92,
+            "Attack Crit Chance": 0.19,
+            "Burden": 1.00,
+            "Interference": 0.33,
+        },
+        "Primary Attributes": {
+            "Agility": 0.14,
+        },
+    },
+)
+
+
 html = """
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en"><head>
 	<meta http-equiv="Content-type" content="text/html; charset=UTF-8">

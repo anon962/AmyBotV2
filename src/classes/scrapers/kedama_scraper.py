@@ -7,14 +7,15 @@ from typing import Any, Literal, Optional, Type
 
 from aiohttp import ClientSession
 from bs4 import BeautifulSoup, Tag
-from classes.db import DB
+from yarl import URL
+
+from classes.db import init_db
 from config import logger, paths
 from utils.http import create_session, do_get, do_post
 from utils.json_cache import JsonCache
 from utils.misc import load_toml, split_lst
 from utils.parse import parse_equip_link, parse_post_date, price_to_int
 from utils.rate_limit import rate_limit
-from yarl import URL
 
 logger = logger.bind(tags=["kedama"])
 
@@ -56,7 +57,9 @@ class KedamaScraper:
 
     @classmethod
     async def scan_auction(cls, url: URL, allow_cached=True) -> None:
-        """Fetch / parse thread then update DB"""
+        """Fetch / parse thread then update db"""
+
+        db = init_db()
 
         async def main():
             page = await fetch(url)
@@ -84,8 +87,8 @@ class KedamaScraper:
             purge(auction_id, listing=True, fails=True, mats=True, equips=True)
 
             # Insert new data
-            with DB:
-                DB.execute(
+            with db:
+                db.execute(
                     """
                     INSERT INTO kedama_auctions
                     (id, title_short, title, start_time, is_complete)
@@ -94,7 +97,7 @@ class KedamaScraper:
                     listing,
                 )
 
-                DB.executemany(
+                db.executemany(
                     """
                     INSERT INTO kedama_mats
                     (id, id_auction, name, quantity, unit_price, price, start_bid, post_index, buyer, seller)
@@ -103,7 +106,7 @@ class KedamaScraper:
                     data["mats"],
                 )
 
-                DB.executemany(
+                db.executemany(
                     """
                     INSERT INTO kedama_equips
                     (id, id_auction, name, eid, key, is_isekai, level, stats, price, start_bid, post_index, buyer, seller)
@@ -112,7 +115,7 @@ class KedamaScraper:
                     data["equips"],
                 )
 
-                DB.executemany(
+                db.executemany(
                     """
                     INSERT INTO kedama_fails_item
                     (id, id_auction, summary)
@@ -132,8 +135,8 @@ class KedamaScraper:
                 cls.HTML_CACHE_FILE.dump(cls.html_cache)
 
                 # Update db
-                with DB:
-                    DB.execute(
+                with db:
+                    db.execute(
                         "UPDATE kedama_auctions SET last_fetch_time = ?", (time.time(),)
                     )
 
@@ -198,11 +201,11 @@ class KedamaScraper:
             id: str, listing=False, equips=False, mats=False, fails=False
         ) -> None:
             # fmt: off
-            with DB:
-                if fails: DB.execute("DELETE FROM kedama_fails_item WHERE id_auction = ?",(id,),)
-                if equips: DB.execute("DELETE FROM kedama_equips WHERE id_auction = ?",(id,),)
-                if mats: DB.execute("DELETE FROM kedama_mats WHERE id_auction = ?",(id,),)
-                if listing: DB.execute("DELETE FROM kedama_auctions WHERE id = ?",(id,),)
+            with db:
+                if fails: db.execute("DELETE FROM kedama_fails_item WHERE id_auction = ?",(id,),)
+                if equips: db.execute("DELETE FROM kedama_equips WHERE id_auction = ?",(id,),)
+                if mats: db.execute("DELETE FROM kedama_mats WHERE id_auction = ?",(id,),)
+                if listing: db.execute("DELETE FROM kedama_auctions WHERE id = ?",(id,),)
             # fmt: on
 
         return await main()
@@ -212,8 +215,8 @@ class KedamaScraper:
         """Get items being auctioned
 
         Returns a dict with the following keys:
-            mats:       list[dict] with keys matching DB table
-            equips:     list[dict] with keys matching DB table
+            mats:       list[dict] with keys matching db table
+            equips:     list[dict] with keys matching db table
             fails:      dict with the following keys: [id, id_auction, summary]
         """
 
