@@ -1,3 +1,5 @@
+import asyncio
+import datetime
 import json
 import sqlite3
 from sqlite3 import Connection
@@ -8,14 +10,17 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import PlainTextResponse
 
 from classes.core.server import logger
+from classes.core.server.fetch_equip import fetch_equip_html, parse_equip_html
 from classes.core.server.middleware import (
     ErrorLog,
     GZipWrapper,
     PerformanceLog,
     RequestLog,
 )
-from classes.db import get_db
+from classes.db import init_db, insert_metadata, select_metadata
 from utils.sql import WhereBuilder
+
+HV_FETCH_DELAY_SECONDS = 3
 
 server = FastAPI()
 
@@ -52,7 +57,7 @@ def get_super_equips(
     buyer: Optional[str] = None,
     buyer_partial: Optional[str] = None,
     complete: Optional[bool] = None,
-    DB: Connection = Depends(get_db),
+    db: Connection = Depends(init_db),
 ):
     """Search for items sold at a Super auction
 
@@ -118,7 +123,7 @@ def get_super_equips(
         where_builder.add("sa_is_complete = ?", int(complete))
 
     # Query DB
-    with DB:
+    with db:
         where, data = where_builder.print()
         query = f"""
             SELECT se.*, sa.end_time as sa_end_time, sa.is_complete as sa_is_complete, sa.title as sa_title, sa.id as sa_id
@@ -127,7 +132,7 @@ def get_super_equips(
             {where}
             """
         logger.trace(f"Search super equips {query} {data}")
-        rows = DB.execute(query, data).fetchall()
+        rows = db.execute(query, data).fetchall()
 
     # Massage data structure
     result = [dict(row) for row in rows]
@@ -161,7 +166,7 @@ def get_kedama_equips(
     seller_partial: Optional[str] = None,
     buyer: Optional[str] = None,
     buyer_partial: Optional[str] = None,
-    DB: Connection = Depends(get_db),
+    db: Connection = Depends(init_db),
 ):
     """Search for items sold at a Kedama auction
 
@@ -223,7 +228,7 @@ def get_kedama_equips(
             where_builder.add("seller LIKE ?", f"%{fragment}%")
 
     # Query DB
-    with DB:
+    with db:
         where, data = where_builder.print()
         query = f"""
             SELECT 
@@ -237,7 +242,7 @@ def get_kedama_equips(
             {where}
             """
         logger.trace(f"Search kedama equips {query} {data}")
-        rows = DB.execute(query, data).fetchall()
+        rows = db.execute(query, data).fetchall()
 
     # Massage data structure
     result = [dict(row) for row in rows]
@@ -263,7 +268,7 @@ def get_lottery(
     user_partial: Optional[str] = None,
     min_date: Optional[float] = None,
     max_date: Optional[float] = None,
-    DB: Connection = Depends(get_db),
+    db: Connection = Depends(init_db),
 ):
     """Search lottery data
 
@@ -306,7 +311,7 @@ def get_lottery(
 
     # Run query
     rows = []
-    with DB:
+    with db:
         for type in ["weapon", "armor"]:
             where, query_data = where_builder.print()
             query = f"""
@@ -314,7 +319,7 @@ def get_lottery(
                 {where}
                 """
             logger.trace(f"Search lottery {query} {query_data}")
-            rs = DB.execute(query, query_data).fetchall()
+            rs = db.execute(query, query_data).fetchall()
             for r in rs:
                 data = dict(r)
                 data["type"] = type
@@ -345,49 +350,101 @@ def get_lottery(
 
 
 @server.get("/export/sqlite", response_class=PlainTextResponse)
-def export_sqlite(DB: Connection = Depends(get_db)):
+def export_sqlite(db: Connection = Depends(init_db)):
     """Equivalent to .dump in sqlite3"""
 
-    DB_COPY = sqlite3.connect(":memory:")
-    DB.backup(DB_COPY)
+    db_copy = sqlite3.connect(":memory:")
+    db.backup(db_copy)
 
-    with DB_COPY:
+    with db_copy:
         # Delete unnecessary tables
-        tables = DB_COPY.execute(
+        tables = db_copy.execute(
             'SELECT name FROM sqlite_master WHERE type = "table"'
         ).fetchall()
         tables = [x[0] for x in tables]
 
         for tbl in tables:
             if tbl not in EXPORTED_TABLES:
-                DB_COPY.execute(f"DROP TABLE {tbl}")
+                db_copy.execute(f"DROP TABLE {tbl}")
 
     # Export
-    resp = "\n".join(DB_COPY.iterdump())
+    resp = "\n".join(db_copy.iterdump())
     return resp
 
 
 @server.get("/export/json")
-def export_json(DB: Connection = Depends(get_db)):
+def export_json(db: Connection = Depends(init_db)):
     """Dump DB as JSON"""
     resp = dict()
 
-    with DB:
+    with db:
         for tbl in EXPORTED_TABLES:
-            resp[tbl] = [dict(x) for x in DB.execute(f"SELECT * FROM {tbl}").fetchall()]
+            resp[tbl] = [dict(x) for x in db.execute(f"SELECT * FROM {tbl}").fetchall()]
 
     return resp
 
 
 @server.get("/equip")
-def get_equip(DB: Connection = Depends(get_db)):
-    resp = dict()
+async def get_equip(
+    eid: int,
+    key: str,
+    is_isekai: bool = False,
+):
+    db = init_db()
 
-    with DB:
-        for tbl in EXPORTED_TABLES:
-            resp[tbl] = [dict(x) for x in DB.execute(f"SELECT * FROM {tbl}").fetchall()]
+    last_fetch = select_metadata(db, "last_hv_fetch")
+    now = datetime.datetime.now()
 
-    return resp
+    if last_fetch:
+        last_fetch = datetime.datetime.fromisoformat(last_fetch)
+        next_fetch = last_fetch + datetime.timedelta(seconds=HV_FETCH_DELAY_SECONDS)
+
+        if now < next_fetch:
+            insert_metadata(db, "last_hv_fetch", next_fetch.isoformat())
+
+            delay = (next_fetch - now).seconds
+            await asyncio.sleep(delay)
+        else:
+            insert_metadata(db, "last_hv_fetch", now.isoformat())
+    else:
+        insert_metadata(db, "last_hv_fetch", now.isoformat())
+
+    db.commit()
+
+    resp = fetch_equip_html(eid, key, is_isekai)
+    if resp.status_code != 200:
+        raise HTTPException(resp.status_code)
+
+    db.execute(
+        """
+        INSERT INTO equips_html (
+            id, key, created_at, html
+        ) VALUES (
+            ?, ?, ?, ?
+        )
+        """,
+        [eid, key, now.isoformat(), resp.text],
+    )
+    db.commit()
+
+    if resp.text not in ["Nope", "No such item"]:
+        data = parse_equip_html(resp.text)
+    else:
+        data = None
+
+    db.execute(
+        """
+        INSERT OR REPLACE INTO equips (
+            id, key, updated_at, data
+        ) VALUES (
+            ?, ?, ?, ?
+        )
+        """,
+        [eid, key, now.isoformat(), json.dumps(data)],
+    )
+    db.commit()
+
+    return data
 
 
 if __name__ == "__main__":

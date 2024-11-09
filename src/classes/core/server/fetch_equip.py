@@ -50,6 +50,7 @@ def parse_equip_html(html: str) -> dict:
 
 
 def _parse_name(doc: BeautifulSoup) -> tuple[str, str | None]:
+    print(doc)
     fst_el = select_one_or_raise(doc, "#showequip > div")
     snd_el = select_one_or_raise(doc, "#showequip > div:nth-child(2)")
 
@@ -309,9 +310,8 @@ def fetch_equip_html(eid: int, key: str, is_isekai: bool):
 
     LOGGER.info(f"Fetching {url}")
     resp = session.get(url)
-    resp.raise_for_status()
 
-    return resp.text
+    return resp
 
 
 def _init_hv_session():

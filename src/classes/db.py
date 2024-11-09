@@ -1,16 +1,15 @@
 import sqlite3
+from typing import Type, TypeAlias
 
 from config import paths
 
+Db: TypeAlias = sqlite3.Connection
 
-def get_db() -> sqlite3.Connection:
+
+def init_db() -> Db:
     db = sqlite3.connect(paths.DATA_DIR / "db.sqlite")
+
     db.row_factory = sqlite3.Row
-    return db
-
-
-def create_tables():
-    db = get_db()
 
     # Super
     with db:
@@ -297,27 +296,69 @@ def create_tables():
 
         db.execute(
             """
-                CREATE TABLE IF NOT EXISTS equips (
-                    id              INTEGER         PRIMARY KEY,
-                    key             TEXT            NOT NULL,
+            CREATE TABLE IF NOT EXISTS equips (
+                id              INTEGER         NOT NULL,
+                key             TEXT            NOT NULL,
 
-                    data            TEXT            NOT NULL,       --json
+                updated_at      TEXT            NOT NULL,
 
-                    is_deleted      INTEGER         NOT NULL,
-                    updated_at      TEXT            NOT NULL
-                ) STRICT;
+                data            TEXT,           --json
+
+                PRIMARY KEY (id, key)
+            ) STRICT;
             """
         )
 
         db.execute(
             """
-                CREATE TABLE IF NOT EXISTS equip_html (
-                    id              INTEGER,
-                    created_at      TEXT            NOT NULL,
+            CREATE TABLE IF NOT EXISTS equips_html (
+                id              INTEGER,
+                key             TEXT            NOT NULL,
 
-                    html            TEXT            NOT NULL,
+                created_at      TEXT            NOT NULL,
 
-                    FOREIGN KEY (id) REFERENCES equips (id)
-                ) STRICT;
+                html            TEXT            NOT NULL
+            ) STRICT;
             """
         )
+
+        db.execute(
+            """
+            CREATE TABLE IF NOT EXISTS metadata (
+                key         TEXT        PRIMARY KEY,
+                value       TEXT        NOT NULL
+            ) STRICT;
+            """
+        )
+
+    return db
+
+
+def select_metadata(db: Db, key: str, default: str | None = None) -> str | None:
+    r = db.execute(
+        """
+        SELECT value FROM metadata
+        WHERE key = ?
+        """,
+        [key],
+    ).fetchone()
+
+    if r is not None:
+        return r["value"]
+    elif default:
+        return default
+    else:
+        return None
+
+
+def insert_metadata(db: Db, key: str, value: str):
+    db.execute(
+        """
+        INSERT OR REPLACE INTO metadata (
+            key, value
+        ) VALUES (
+            ?, ?
+        )
+        """,
+        [key, value],
+    )
