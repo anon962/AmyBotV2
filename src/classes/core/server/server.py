@@ -379,6 +379,17 @@ def export_json(DB: Connection = Depends(get_db)):
     return resp
 
 
+@server.get("/equip")
+def get_equip(DB: Connection = Depends(get_db)):
+    resp = dict()
+
+    with DB:
+        for tbl in EXPORTED_TABLES:
+            resp[tbl] = [dict(x) for x in DB.execute(f"SELECT * FROM {tbl}").fetchall()]
+
+    return resp
+
+
 if __name__ == "__main__":
     import uvicorn
 

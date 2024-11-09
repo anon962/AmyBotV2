@@ -4,17 +4,17 @@ from config import paths
 
 
 def get_db() -> sqlite3.Connection:
-    DB = sqlite3.connect(paths.DATA_DIR / "db.sqlite")
-    DB.row_factory = sqlite3.Row
-    return DB
+    db = sqlite3.connect(paths.DATA_DIR / "db.sqlite")
+    db.row_factory = sqlite3.Row
+    return db
 
 
 def create_tables():
-    DB = get_db()
+    db = get_db()
 
     # Super
-    with DB:
-        DB.execute(
+    with db:
+        db.execute(
             """
             CREATE TABLE IF NOT EXISTS super_auctions (
                 id                          TEXT,
@@ -29,7 +29,7 @@ def create_tables():
             """
         )
 
-        DB.execute(
+        db.execute(
             """
             CREATE TABLE IF NOT EXISTS super_equips (
                 id                  TEXT,
@@ -54,7 +54,7 @@ def create_tables():
             """
         )
 
-        DB.execute(
+        db.execute(
             """
             CREATE TABLE IF NOT EXISTS super_mats (
                 id                  TEXT,
@@ -76,7 +76,7 @@ def create_tables():
             """
         )
 
-        DB.execute(
+        db.execute(
             """
             CREATE TABLE IF NOT EXISTS super_fails (
                 id              TEXT,
@@ -92,8 +92,8 @@ def create_tables():
         )
 
     # Kedama
-    with DB:
-        DB.execute(
+    with db:
+        db.execute(
             """
             CREATE TABLE IF NOT EXISTS kedama_auctions (
                 id                          TEXT,
@@ -109,7 +109,7 @@ def create_tables():
             """
         )
 
-        DB.execute(
+        db.execute(
             """
             CREATE TABLE IF NOT EXISTS kedama_equips (
                 id                  TEXT,
@@ -134,7 +134,7 @@ def create_tables():
             """
         )
 
-        DB.execute(
+        db.execute(
             """
             CREATE TABLE IF NOT EXISTS kedama_mats (
                 id                  TEXT,
@@ -156,7 +156,7 @@ def create_tables():
             """
         )
 
-        DB.execute(
+        db.execute(
             """
             CREATE TABLE IF NOT EXISTS kedama_fails_item (
                 id              TEXT,
@@ -171,8 +171,8 @@ def create_tables():
         )
 
     # Discord
-    with DB:
-        DB.execute(
+    with db:
+        db.execute(
             """
             CREATE TABLE IF NOT EXISTS discord_watch_more (
                 id              INTEGER,
@@ -187,7 +187,7 @@ def create_tables():
             """
         )
 
-        DB.execute(
+        db.execute(
             """
             CREATE TABLE IF NOT EXISTS discord_watch_change (
                 id              INTEGER,
@@ -201,8 +201,8 @@ def create_tables():
         )
 
     # Lottery
-    with DB:
-        DB.execute(
+    with db:
+        db.execute(
             """
             CREATE TABLE IF NOT EXISTS lottery_weapon (
                 id          INTEGER,
@@ -233,7 +233,7 @@ def create_tables():
             """
         )
 
-        DB.execute(
+        db.execute(
             """
                 CREATE TABLE IF NOT EXISTS lottery_armor (
                     id          INTEGER,
@@ -262,4 +262,62 @@ def create_tables():
                     PRIMARY KEY (id)
                 ) STRICT;
                 """
+        )
+
+        db.execute(
+            """
+                CREATE TABLE IF NOT EXISTS lottery_armor (
+                    id          INTEGER,
+
+                    date        REAL        NOT NULL,   --start time
+                    tickets     INTEGER     NOT NULL,
+                    
+                    -- Grand prize (equip)
+                    "1_prize"     TEXT,
+                    "1_user"      TEXT        NOT NULL,
+
+                    -- Core prize (prize column isn't important)
+                    "1b_prize"    TEXT        NOT NULL,
+                    "1b_user"     TEXT,
+
+                    -- Prize column contains json: '[quantity, "item_name"]'
+                    "2_prize"     TEXT        NOT NULL,
+                    "2_user"      TEXT        NOT NULL,
+                    "3_prize"     TEXT        NOT NULL,
+                    "3_user"      TEXT        NOT NULL,
+                    "4_prize"     TEXT        NOT NULL,
+                    "4_user"      TEXT        NOT NULL,
+                    "5_prize"     TEXT        NOT NULL,
+                    "5_user"      TEXT        NOT NULL,
+
+                    PRIMARY KEY (id)
+                ) STRICT;
+                """
+        )
+
+        db.execute(
+            """
+                CREATE TABLE IF NOT EXISTS equips (
+                    id              INTEGER         PRIMARY KEY,
+                    key             TEXT            NOT NULL,
+
+                    data            TEXT            NOT NULL,       --json
+
+                    is_deleted      INTEGER         NOT NULL,
+                    updated_at      TEXT            NOT NULL
+                ) STRICT;
+            """
+        )
+
+        db.execute(
+            """
+                CREATE TABLE IF NOT EXISTS equip_html (
+                    id              INTEGER,
+                    created_at      TEXT            NOT NULL,
+
+                    html            TEXT            NOT NULL,
+
+                    FOREIGN KEY (id) REFERENCES equips (id)
+                ) STRICT;
+            """
         )

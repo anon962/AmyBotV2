@@ -1,5 +1,6 @@
-from loguru import logger
 import loguru
+from loguru import logger
+
 from config import paths
 
 
@@ -43,6 +44,12 @@ def init_logger():
         logger.add(
             paths.LOG_DIR / "lottery.log",
             filter=lambda record: "lottery" in record["extra"].get("tags", []),
+            level="DEBUG",
+        )
+
+        logger.add(
+            paths.LOG_DIR / "equip.log",
+            filter=lambda record: "equip_parser" in record["extra"].get("tags", []),
             level="DEBUG",
         )
 

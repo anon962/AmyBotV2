@@ -1,7 +1,7 @@
 import traceback
 
 from classes.core.discord.disk_watchers import FileWatcher
-from classes.core.discord.equip_cog import EquipCog
+from classes.core.discord.equip_cog.equip_cog import EquipCog
 from classes.core.discord.lottery_cog import LotteryCog
 from classes.core.discord.meta_cog import MetaCog
 from classes.core.discord.services.permissions_service import PermissionsService

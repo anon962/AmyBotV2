@@ -1,5 +1,6 @@
-from typing import Any, Literal
+from typing import Any, Literal, TypeAlias
 
+import bs4
 from aiohttp import ClientSession
 from bs4 import BeautifulSoup
 from yarl import URL
