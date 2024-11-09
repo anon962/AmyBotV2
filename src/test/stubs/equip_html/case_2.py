@@ -1,3 +1,99 @@
+# https://hentaiverse.org/equip/111371669/d6aaad6370
+# renamed, forged, iw'd, soulbound
+
+data = dict(
+    name="Legendary Onyx Power Boots of Slaughter",
+    alt_name="IW10 Power Slaughter Boots - J3 F3",
+    category="Heavy Armor",
+    level="Soulbound",
+    condition=dict(
+        current=327,
+        max=395,
+    ),
+    potency=dict(
+        tier=10,
+        current_xp=None,
+        max_xp=None,
+    ),
+    weapon_damage=None,
+    stats={
+        "misc": {
+            "Attack Damage": dict(
+                value=679.63,
+                base=21.92,
+            ),
+            "Attack Accuracy": dict(
+                value=5.04,
+                base=4.58,
+            ),
+            "Attack Crit Chance": dict(
+                value=1.43,
+                base=1.14,
+            ),
+            "Attack Crit Damage": dict(
+                value=1.06,
+                base=1.06,
+            ),
+            "Physical Mitigation": dict(
+                value=8.48,
+                base=6.78,
+            ),
+            "Magical Mitigation": dict(
+                value=6.76,
+                base=5.41,
+            ),
+            "HP Bonus": dict(
+                value=6.00,
+                base=6.0,
+            ),
+            "Burden": dict(
+                value=8.54,
+                base=8.54,
+            ),
+            "Interference": dict(
+                value=14.70,
+                base=14.7,
+            ),
+        },
+        "Damage Mitigations": {
+            "Crushing": dict(value=3.97, base=3.97),
+            "Slashing": dict(value=6.18, base=6.18),
+            "Piercing": dict(value=6.50, base=6.50),
+            "Dark": dict(value=21.71, base=21.71),
+            "Wind": dict(value=16.00, base=16.00),
+            "Fire": dict(value=12.00, base=12.00),
+        },
+        "Primary Attributes": {
+            "Strength": dict(value=78.71, base=5.25),
+            "Dexterity": dict(value=80.65, base=5.38),
+            "Endurance": dict(value=62.65, base=4.18),
+        },
+    },
+    upgrades={
+        "Physical Damage": 5,
+        "Physical Hit Chance": 5,
+        "Physical Crit Chance": 5,
+        "Physical Defense": 5,
+        "Magical Defense": 5,
+        "Crushing Mitigation": 5,
+        "Slashing Mitigation": 5,
+        "Piercing Mitigation": 5,
+        "Dark Mitigation": 5,
+        "Strength Bonus": 5,
+        "Dexterity Bonus": 5,
+        "Endurance Bonus": 5,
+    },
+    enchants={
+        "Juggernaut": 3,
+        "Fireproof": 3,
+        "Windproof": 4,
+    },
+    owner=dict(
+        name="Scremaz",
+        uid=11328,
+    ),
+)
+
 html = """
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en"><head>
 	<meta http-equiv="Content-type" content="text/html; charset=UTF-8">
