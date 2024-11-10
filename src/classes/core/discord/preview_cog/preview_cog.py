@@ -5,6 +5,7 @@ from discord.ext import commands
 
 from classes.core import discord
 from classes.core.discord import types as types
+from classes.core.discord.discord_watchers import DeleteWatcher, EditWatcher
 from classes.core.discord.preview_cog.on_equip_message import (
     extract_links,
     on_equip_message,
@@ -32,4 +33,15 @@ class PreviewCog(commands.Cog):
             if not equip_previews:
                 return
 
-            await msg.channel.send("".join(equip_previews))
+            response = await msg.channel.send("".join(equip_previews))
+
+        self.bot.watcher_cog.register(
+            await EditWatcher(
+                msg.id, [response.id], msg.channel.id, self.bot
+            ).__ainit__()
+        )
+        self.bot.watcher_cog.register(
+            await DeleteWatcher(
+                msg.id, [response.id], msg.channel.id, self.bot
+            ).__ainit__()
+        )

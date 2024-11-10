@@ -1,10 +1,6 @@
 from dataclasses import dataclass, field
 from typing import Optional
 
-from classes.core import discord
-from classes.core.discord import discord_watchers
-from config import logger
-
 from discord import (
     Message,
     RawMessageDeleteEvent,
@@ -12,6 +8,10 @@ from discord import (
     RawReactionActionEvent,
 )
 from discord.ext import commands
+
+from classes.core import discord
+from classes.core.discord import discord_watchers
+from config import logger
 
 logger = logger.bind(tags=["discord_bot"])
 
@@ -34,6 +34,7 @@ class WatcherCog(commands.Cog):
         try:
             self.watchers.remove(w)
         except ValueError:
+            # @todo: why is the remove failing?
             logger.warning(f"Tried to remove unregistered watcher: {w}")
 
     def purge(

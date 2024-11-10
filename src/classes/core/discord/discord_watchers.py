@@ -1,10 +1,6 @@
 from dataclasses import dataclass
 from typing import ClassVar
 
-from classes.core import discord as core
-from classes.core.discord.watcher_cog import WatcherCog
-from config import logger
-
 import discord
 from discord import (
     Message,
@@ -13,6 +9,10 @@ from discord import (
     RawReactionActionEvent,
 )
 from discord.ext.commands import Context
+
+from classes.core import discord as core
+from classes.core.discord.watcher_cog import WatcherCog
+from config import logger
 
 logger = logger.bind(tags=["discord_bot"])
 
@@ -201,7 +201,11 @@ class EditWatcher(DWatcher):
         # Trigger command
         msg = await self.channel_obj.fetch_message(self.message)  # type: ignore
         assert msg is not None
+
         await self.bot.on_message(msg)
+        for cog in self.bot.cogs.values():
+            if hasattr(cog, "on_message"):
+                await cog.on_message(msg)  # type: ignore
 
 
 class MoreWatcher(DWatcher):
