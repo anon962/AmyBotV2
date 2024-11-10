@@ -94,6 +94,36 @@ data = dict(
     ),
 )
 
+
+calculations = dict(
+    percentiles={
+        "misc": {
+            "Attack Damage": 0.67,
+            "Attack Accuracy": 0.16,
+            "Attack Crit Chance": 0.46,
+            "Attack Crit Damage": 0.55,
+            "Physical Mitigation": 0.48,
+            "Magical Mitigation": 0.94,
+            "HP Bonus": None,
+            "Burden": 0.11,
+            "Interference": 0.56,
+        },
+        "Damage Mitigations": {
+            "Crushing": 0.50,
+            "Slashing": 0.19,
+            "Piercing": 0.79,
+            "Dark": 0.64,
+            "Wind": None,
+            "Fire": None,
+        },
+        "Primary Attributes": {
+            "Strength": 0.01,
+            "Dexterity": 0.803,
+            "Endurance": 0.902,
+        },
+    },
+)
+
 html = """
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en"><head>
 	<meta http-equiv="Content-type" content="text/html; charset=UTF-8">

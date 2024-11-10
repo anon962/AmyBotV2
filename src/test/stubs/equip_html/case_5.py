@@ -101,6 +101,34 @@ data = dict(
     ),
 )
 
+calculations = dict(
+    percentiles={
+        "misc": {
+            "Physical Mitigation": 0.98,
+            "Magical Mitigation": 0.92,
+            # Not sure why LPR is wrong here, there's no hard-coded override
+            "Evade Chance": "ignore",
+            "Resist Chance": "ignore",
+            # "Evade Chance": 0.55,
+            # "Resist Chance": 0.81,
+            "Burden": 0.0,
+            "Interference": 0.0,
+        },
+        "Damage Mitigations": {
+            "Crushing": 0.99,
+            "Slashing": 0.92,
+            "Piercing": 0.99,
+            "Cold": -0.48,
+        },
+        "Primary Attributes": {
+            "Strength": 0.99,
+            "Dexterity": 0.99,
+            "Endurance": 0.99,
+            "Agility": 0.99,
+        },
+    }
+)
+
 html = """
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en"><head>
 	<meta http-equiv="Content-type" content="text/html; charset=UTF-8">

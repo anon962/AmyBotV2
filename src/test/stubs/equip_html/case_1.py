@@ -118,7 +118,7 @@ calculations = dict(
         },
         "misc": {
             "Magic Damage": 0.22,
-            "Casting Speed": 0.0293,
+            "Casting Speed": None,
             "Magic Accuracy": 0.65,
             "Magic Crit Chance": 0.59,
             "Counter-Resist": 0.27,

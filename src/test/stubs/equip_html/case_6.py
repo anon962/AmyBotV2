@@ -75,7 +75,7 @@ calculations = dict(
         "Primary Attributes": {
             "Agility": 0.14,
         },
-    },
+    }
 )
 
 
