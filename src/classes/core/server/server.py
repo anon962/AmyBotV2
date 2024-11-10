@@ -5,12 +5,16 @@ import sqlite3
 from sqlite3 import Connection
 from typing import Optional
 
+import aiohttp
+import requests
+from bs4 import BeautifulSoup
 from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import PlainTextResponse
 
 from classes.core.server import logger
-from classes.core.server.fetch_equip import fetch_equip_html, parse_equip_html
+from classes.core.server.fetch_equip import LOGGER, fetch_equip_html, parse_equip_html
+from classes.core.server.infer_equip_stats import infer_equip_stats
 from classes.core.server.middleware import (
     ErrorLog,
     GZipWrapper,
@@ -18,9 +22,12 @@ from classes.core.server.middleware import (
     RequestLog,
 )
 from classes.db import init_db, insert_metadata, select_metadata
+from config.paths import RANGES_FILE
+from utils.html import select_one_or_raise
 from utils.sql import WhereBuilder
 
 HV_FETCH_DELAY_SECONDS = 3
+RANGE_FETCH_DELAY_SECONDS = 86400 * 3
 
 server = FastAPI()
 
@@ -427,10 +434,11 @@ async def get_equip(
     )
     db.commit()
 
-    if resp.text not in ["Nope", "No such item"]:
-        data = parse_equip_html(resp.text)
-    else:
-        data = None
+    if resp.text in ["Nope", "No such item"]:
+        raise HTTPException(404)
+
+    data = parse_equip_html(resp.text)
+    data["calculations"] = infer_equip_stats(data)
 
     db.execute(
         """
@@ -447,9 +455,43 @@ async def get_equip(
     return data
 
 
-if __name__ == "__main__":
-    import uvicorn
+def create_range_update_task():
+    async def poll_ranges():
+        while True:
+            db = init_db()
 
-    uvicorn.run(
-        "classes.core.server.server:server", host="0.0.0.0", port=4545, reload=True
-    )
+            delay = 0
+            last_fetch = select_metadata(db, "last_range_update")
+
+            if last_fetch:
+                last_fetch = datetime.datetime.fromisoformat(last_fetch)
+                next_fetch = last_fetch + datetime.timedelta(
+                    seconds=RANGE_FETCH_DELAY_SECONDS
+                )
+                now = datetime.datetime.now()
+
+                if now < next_fetch:
+                    delay = (next_fetch - now).seconds
+                    LOGGER.info(f"Sleeping for {delay}s before range fetch...")
+                    await asyncio.sleep(delay)
+
+            now = datetime.datetime.now()
+            insert_metadata(db, "last_range_update", now.isoformat())
+            db.commit()
+
+            LOGGER.info("Fetching ranges...")
+            async with aiohttp.ClientSession() as session:
+                resp = await session.get("https://reasoningtheory.net/viewranges")
+                html = await resp.text()
+
+            if resp.status != 200:
+                LOGGER.error(f"Range update failed with {resp.status}")
+
+            soup = BeautifulSoup(html, "lxml")
+            script_el = select_one_or_raise(soup, "[data-itemranges]")
+
+            data = json.loads(script_el["data-itemranges"])  # type: ignore
+            RANGES_FILE.write_text(json.dumps(data))
+            LOGGER.info("Range update complete")
+
+    return poll_ranges()

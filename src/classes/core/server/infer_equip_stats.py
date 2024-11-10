@@ -8,21 +8,35 @@ from config import paths
 LOGGER = loguru.logger.bind(tags=["equip_parser"])
 
 
-def infer_equip_stats(equip: dict, ranges_override: dict | None = None):
+def infer_equip_stats(
+    equip: dict,
+    ranges_override: dict | None = None,
+):
     percentiles = _calc_all_percentiles(equip, ranges_override)
+    legendary_percentiles = _calc_all_percentiles(
+        equip, ranges_override, tier_override="Legendary"
+    )
 
     return dict(
         percentiles=percentiles,
+        legendary_percentiles=legendary_percentiles,
     )
 
 
-def _calc_all_percentiles(equip: dict, ranges_override: dict | None = None):
+def _calc_all_percentiles(
+    equip: dict,
+    ranges_override: dict | None = None,
+    tier_override: str | None = None,
+):
     if ranges_override is None:
         ranges = json.loads(paths.RANGES_FILE.read_text())
     else:
         ranges = ranges_override
 
     path_options = _enumerate_range_path_options_from_name(equip["name"])
+    if tier_override:
+        for p in path_options:
+            p["quality"] = tier_override
 
     percentiles = dict()
 

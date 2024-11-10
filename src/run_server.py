@@ -1,6 +1,22 @@
-if __name__ == "__main__":
-    import uvicorn
+import asyncio
 
-    uvicorn.run(
-        "classes.core.server.server:server", host="0.0.0.0", port=4545, reload=True
+from uvicorn import Config, Server
+
+from classes.core.server.server import create_range_update_task
+
+if __name__ == "__main__":
+
+    loop = asyncio.new_event_loop()
+
+    loop.create_task(create_range_update_task())
+
+    server = Server(
+        config=Config(
+            app="classes.core.server.server:server",
+            loop=loop,  # type: ignore
+            host="0.0.0.0",
+            port=4545,
+        )
     )
+
+    loop.run_until_complete(server.serve())
