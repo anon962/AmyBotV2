@@ -6,6 +6,7 @@ data = dict(
     alt_name="iw10 power slaughter boots  j3 f3",
     category="Heavy Armor",
     level="Soulbound",
+    is_tradeable=False,
     condition=dict(
         current=327,
         max=395,

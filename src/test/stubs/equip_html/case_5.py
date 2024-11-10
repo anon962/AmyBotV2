@@ -6,6 +6,7 @@ data = dict(
     alt_name=None,
     category="Light Armor",
     level="Unassigned",
+    is_tradeable=True,
     condition=dict(
         current=844,
         max=900,

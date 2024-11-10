@@ -6,6 +6,7 @@ data = dict(
     alt_name=None,
     category="Shield",
     level=156,
+    is_tradeable=True,
     condition=dict(
         current=258,
         max=290,

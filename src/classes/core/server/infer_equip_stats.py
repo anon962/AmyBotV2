@@ -41,7 +41,7 @@ def _calc_all_percentiles(
     percentiles = dict()
 
     if equip["weapon_damage"]:
-        base = equip["weapon_damage"]["damage"]["base"]
+        base = equip["weapon_damage"]["Attack Damage"]["base"]
         real_base = _downgrade_stat("", "Attack Damage", base, equip)
 
         percentiles["weapon_damage"] = {
@@ -281,10 +281,10 @@ def _calc_percentile(
             return 1.0
 
         percentile = (base_value - mn) / (mx - mn)
-        if percentile < -0.1 or percentile > 1.1:
-            LOGGER.warning(
-                f"Incorrect range for {stat}: {percentile} [{mn}, {mx}] {base_value} {p}"
-            )
+        # if percentile < -0.1 or percentile > 1.1:
+        #     LOGGER.warning(
+        #         f"Incorrect range for {stat}: {percentile} [{mn}, {mx}] {base_value} {p}"
+        #     )
 
         # print("range", stat, base_value, mn, mx, p)
         return percentile

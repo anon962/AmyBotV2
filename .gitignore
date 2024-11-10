@@ -1,5 +1,6 @@
 src/config/default_perms.toml
 src/config/discord_config.toml
+src/config/preview_config.toml
 src/config/secrets.toml
 
 src/data/cache/

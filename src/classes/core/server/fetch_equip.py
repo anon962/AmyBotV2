@@ -38,6 +38,7 @@ def fetch_equip_html(eid: int, key: str, is_isekai: bool):
 
     LOGGER.info(f"Fetching {url}")
     resp = session.get(url)
+    LOGGER.info("Fetch complete.")
 
     return resp
 
@@ -46,7 +47,7 @@ def parse_equip_html(html: str) -> dict:
     soup = BeautifulSoup(html, "lxml")
 
     name, alt_name = _parse_name(soup)
-    category, level = _parse_equip_category(soup)
+    category, level, is_tradeable = _parse_equip_category(soup)
     status = _parse_status(soup)
     weapon_damage = _parse_weapon_damage(soup)
     misc_stats = _parse_misc_stats(soup)
@@ -60,6 +61,7 @@ def parse_equip_html(html: str) -> dict:
         alt_name=alt_name,
         category=category,
         level=level,
+        is_tradeable=is_tradeable,
         weapon_damage=weapon_damage,
         stats=dict(
             misc=misc_stats,
@@ -111,7 +113,7 @@ def _parse_name_el(el: Tag):
     return name
 
 
-def _parse_equip_category(soup: BeautifulSoup) -> tuple[str, int | str]:
+def _parse_equip_category(soup: BeautifulSoup) -> tuple[str, int | str, bool]:
     category_el = select_one_or_raise(soup, ".eq > div")
 
     text = get_self_text(category_el)
@@ -131,7 +133,10 @@ def _parse_equip_category(soup: BeautifulSoup) -> tuple[str, int | str]:
     else:
         raise ValueError(text)
 
-    return category, level
+    tradability_el = select_one_or_raise(category_el, "span")
+    is_tradable = get_stripped_text(tradability_el) == "Tradeable"
+
+    return category, level, is_tradable
 
 
 def _parse_status(soup: BeautifulSoup) -> dict:
@@ -172,11 +177,11 @@ def _parse_weapon_damage(soup: BeautifulSoup) -> dict | None:
     if not len(line_els):
         return None
 
-    d: dict = dict(
-        damage=None,
-        strikes=[],
-        status_effects=[],
-    )
+    d: dict = {
+        "Attack Damage": None,
+        "strikes": [],
+        "status_effects": [],
+    }
 
     for el in line_els:
         # +895 Crushing Damage
@@ -189,7 +194,9 @@ def _parse_weapon_damage(soup: BeautifulSoup) -> dict | None:
             m_base = search_or_raise(r"Base: (\d+(?:\.\d+)?)", raw_base)
             damage_base = float(m_base.group(1))
 
-            d["damage"] = dict(type=damage_type, value=damage_value, base=damage_base)
+            d["Attack Damage"] = dict(
+                type=damage_type, value=damage_value, base=damage_base
+            )
             continue
 
         # Dark Strike + Void Strike

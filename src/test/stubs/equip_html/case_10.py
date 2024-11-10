@@ -6,6 +6,7 @@ data = dict(
     alt_name=None,
     category="Cloth Armor",
     level="Soulbound",
+    is_tradeable=False,
     condition=dict(
         current=285,
         max=300,

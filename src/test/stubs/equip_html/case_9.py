@@ -6,6 +6,7 @@ data = dict(
     alt_name=None,
     category="Staff",
     level="Soulbound",
+    is_tradeable=False,
     condition=dict(
         current=570,
         max=600,
@@ -15,20 +16,20 @@ data = dict(
         current_xp=None,
         max_xp=None,
     ),
-    weapon_damage=dict(
-        damage=dict(
+    weapon_damage={
+        "Attack Damage": dict(
             type="Void",
             value=1178,
             base=38.0,
         ),
-        strikes=[
+        "strikes": [
             "Dark",
             "Void",
         ],
-        status_effects=[
+        "status_effects": [
             "Ether Tap : 40% chance - 4 turns",
         ],
-    ),
+    },
     stats={
         "misc": {
             "Magic Damage": dict(value=1973.05, base=85.78),

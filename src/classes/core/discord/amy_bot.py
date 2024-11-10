@@ -1,20 +1,21 @@
 import traceback
 
-from classes.core.discord.disk_watchers import FileWatcher
-from classes.core.discord.equip_cog.equip_cog import EquipCog
-from classes.core.discord.lottery_cog import LotteryCog
-from classes.core.discord.meta_cog import MetaCog
-from classes.core.discord.services.permissions_service import PermissionsService
-from classes.core.discord.watcher_cog import WatcherCog
-from config import logger, paths
-from tomlkit.toml_document import TOMLDocument
-from utils.discord import paginate
-from utils.misc import dump_toml, load_toml
-from yarl import URL
-
 import discord
 from discord.ext import commands
 from discord.ext.commands import CheckFailure, Context
+from tomlkit.toml_document import TOMLDocument
+from yarl import URL
+
+from classes.core.discord.disk_watchers import FileWatcher
+from classes.core.discord.equip_cog import EquipCog
+from classes.core.discord.lottery_cog import LotteryCog
+from classes.core.discord.meta_cog import MetaCog
+from classes.core.discord.preview_cog.preview_cog import PreviewCog
+from classes.core.discord.services.permissions_service import PermissionsService
+from classes.core.discord.watcher_cog import WatcherCog
+from config import logger, paths
+from utils.discord import paginate
+from utils.misc import dump_toml, load_toml
 
 logger = logger.bind(tags=["discord_bot"])
 
@@ -60,6 +61,7 @@ class AmyBot(commands.Bot):
         await self.add_cog(self.watcher_cog)
         await self.add_cog(EquipCog(self))
         await self.add_cog(LotteryCog(self))
+        await self.add_cog(PreviewCog(self))
         await self.add_cog(MetaCog(self))  # should be last cog added
 
         logger.info(f"Logged in as {bot.user}")

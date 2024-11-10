@@ -6,6 +6,7 @@ data = dict(
     alt_name=None,
     category="One-handed Weapon",
     level=309,
+    is_tradeable=True,
     condition=dict(
         current=173,
         max=253,
@@ -15,18 +16,18 @@ data = dict(
         current_xp=0,
         max_xp=259,
     ),
-    weapon_damage=dict(
-        damage=dict(
+    weapon_damage={
+        "Attack Damage": dict(
             type="Piercing",
             value=498,
             base=25.48,
         ),
-        strikes=[],
-        status_effects=[
+        "strikes": [],
+        "status_effects": [
             "Penetrated Armor : 15.6% chance - 6 turns",
             "Siphon Magic : 24.5% chance - 0.72% base drain",
         ],
-    ),
+    },
     stats={
         "misc": {
             "Attack Accuracy": dict(

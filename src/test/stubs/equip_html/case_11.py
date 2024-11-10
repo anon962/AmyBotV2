@@ -6,6 +6,7 @@ data = dict(
     alt_name="IW10 Ethereal Rapier DW - B4 F3 O2 Cold",
     category="One-handed Weapon",
     level="Soulbound",
+    is_tradeable=False,
     condition=dict(
         current=349,
         max=383,
@@ -15,20 +16,20 @@ data = dict(
         current_xp=None,
         max_xp=None,
     ),
-    weapon_damage=dict(
-        damage=dict(
+    weapon_damage={
+        "Attack Damage": dict(
             type="Void",
             value=2275,
             base=73.37,
         ),
-        strikes=[
+        "strikes": [
             "Cold",
             "Void",
         ],
-        status_effects=[
+        "status_effects": [
             "Penetrated Armor : 21.7% chance - 7 turns",
         ],
-    ),
+    },
     stats={
         "misc": {
             "Attack Accuracy": dict(value=25.74, base=23.4),

@@ -1,0 +1,439 @@
+# @todo config for equip previews is ugly and hard to write, maybe move to python file 
+
+# forum / bounty
+max_body_length = 250
+max_body_lines = 6
+max_title_length = 50
+long_multiplier = 2   # multiply above params by this value when link prefixed with !
+
+max_tries = 3     # for pages that require login (namely bounties)
+hath_value = 3700
+
+thread_title_template = '''
+  {{TITLE}}
+'''
+
+thread_body_template = '''
+  {{SUB_TITLE}}
+  ```fix
+  {{BODY}}
+  ```
+  by [{{USERNAME}}]({{USER_LINK}}) | {{"%02d"|format(YEAR)}}-{{"%02d"|format(MONTH)}}-{{"%02d"|format(DAY)}} | {{FORUM|truncate(15,True)}}
+'''
+
+comment_title_template = '''
+  {{TITLE}}
+'''
+
+comment_body_template = '''
+  ```fix
+  {{BODY}}
+  ```
+  by [{{USERNAME}}]({{USER_LINK}}) | {{"%02d"|format(YEAR)}}-{{"%02d"|format(MONTH)}}-{{"%02d"|format(DAY)}} | {{FORUM|truncate(15,True)}}
+'''
+
+bounty_title_template = '''
+  {{TITLE}}
+'''
+
+bounty_body_template = '''
+  ```css
+  [ {{TYPE}} | ~{{CREDIT_VALUE}} Credits | {{STATUS}} ]
+
+  {{BODY}}
+  ```
+  by [{{USERNAME}}]({{USER_LINK}}) | {{"%02d-%02d-%02d"|format(YEAR,MONTH,DAY)}}
+'''
+
+# HV equips
+[equip]
+api_url = 'https://hvdata.gisadan.dev'
+use_legendary_ranges = true
+
+[equip.terse]
+# show non-mandatory stats above this percentile
+min_percentile = 0.75
+
+# stats where the min_percentile should be inverted
+negative_stats = [["misc", "Burden"], ["misc", "Interference"]]
+
+[equip.terse.required_stats]
+"" = [["misc", "Block Chance"], ["misc", "Parry Chance"]]
+staff = [
+  [
+    "misc",
+    "Magic Damage",
+  ],
+  [
+    "Proficiency",
+    "Deprecating",
+  ],
+  [
+    "Primary Attributes",
+    "Intelligence",
+  ],
+  [
+    "Primary Attributes",
+    "Wisdom",
+  ],
+]
+
+"fiery staff" = [["Proficiency", "Fire"]]
+"arctic staff" = [["Proficiency", "Cold"]]
+"temp staff" = [["Proficiency", "Wind"]]
+"shock staff" = [["Proficiency", "Elec"]]
+"hallowed staff" = [["Proficiency", "Holy"]]
+"demon staff" = [["Proficiency", "Dark"]]
+
+surtr = [["Spell Damage", "Fire"], ["Proficiency", "Elemental"]]
+nifl = [["Spell Damage", "Cold"], ["Proficiency", "Elemental"]]
+freyr = [["Spell Damage", "Wind"], ["Proficiency", "Elemental"]]
+mjo = [["Spell Damage", "Elec"], ["Proficiency", "Elemental"]]
+heimd = [["Spell Damage", "Holy"], ["Proficiency", "Divine"]]
+fenr = [["Spell Damage", "Dark"], ["Proficiency", "Forbidden"]]
+
+"the elem" = [["Proficiency", "Elemental"]]
+"the demon" = [["Proficiency", "Forbidden"]]
+"the heaven" = [["Proficiency", "Divine"]]
+
+waki = [["weapon_damage", "Attack Damage"]]
+axe = [["weapon_damage", "Attack Damage"]]
+club = [["weapon_damage", "Attack Damage"]]
+rapier = [["weapon_damage", "Attack Damage"]]
+sword = [["weapon_damage", "Attack Damage"]]
+estoc = [["weapon_damage", "Attack Damage"]]
+mace = [["weapon_damage", "Attack Damage"]]
+katana = [["weapon_damage", "Attack Damage"]]
+
+leather = [
+  [
+    "Primary Attributes",
+    "Strength",
+  ],
+  [
+    "Primary Attributes",
+    "Dexterity",
+  ],
+  [
+    "Primary Attributes",
+    "Endurance",
+  ],
+]
+shade = [
+  [
+    "Primary Attributes",
+    "Strength",
+  ],
+  [
+    "Primary Attributes",
+    "Dexterity",
+  ],
+  [
+    "Primary Attributes",
+    "Endurance",
+  ],
+  "attack damage",
+]
+plate = [
+  [
+    "Primary Attributes",
+    "Strength",
+  ],
+  [
+    "Primary Attributes",
+    "Dexterity",
+  ],
+  [
+    "Primary Attributes",
+    "Endurance",
+  ],
+]
+power = [
+  [
+    "Primary Attributes",
+    "Strength",
+  ],
+  [
+    "Primary Attributes",
+    "Dexterity",
+  ],
+  [
+    "Primary Attributes",
+    "Endurance",
+  ],
+  [
+    "weapon_damage",
+    "Attack Damage",
+  ],
+]
+
+[[equip.expanded.categories]]
+name = "Offensive"
+stat_paths = [
+  [
+    "weapon_damage",
+    "Attack Damage",
+  ],
+  [
+    "misc",
+    "Attack Damage",
+  ],
+  [
+    "misc",
+    "Magic Damage",
+  ],
+  [
+    "Spell Damage",
+    "Fire",
+  ],
+  [
+    "Spell Damage",
+    "Cold",
+  ],
+  [
+    "Spell Damage",
+    "Wind",
+  ],
+  [
+    "Spell Damage",
+    "Elec",
+  ],
+  [
+    "Spell Damage",
+    "Holy",
+  ],
+  [
+    "Spell Damage",
+    "Dark",
+  ],
+  [
+    "misc",
+    "Attack Crit Chance",
+  ],
+  [
+    "misc",
+    "Magic Crit Chance",
+  ],
+  [
+    "misc",
+    "Attack Crit Damage",
+  ],
+  [
+    "misc",
+    "Magic Crit Damage",
+  ],
+  [
+    "Primary Attributes",
+    "Intelligence",
+  ],
+  [
+    "Primary Attributes",
+    "Wisdom",
+  ],
+  [
+    "Primary Attributes",
+    "Strength",
+  ],
+  [
+    "Primary Attributes",
+    "Dexterity",
+  ],
+]
+
+[[equip.expanded.categories]]
+name = "Defensive"
+stat_paths = [
+  [
+    "misc",
+    "Parry",
+  ],
+  [
+    "misc",
+    "Physical Mitigation",
+  ],
+  [
+    "misc",
+    "Magical Mitigation",
+  ],
+  [
+    "Damage Mitigations",
+    "Crushing",
+  ],
+  [
+    "Damage Mitigations",
+    "Slashing",
+  ],
+  [
+    "Damage Mitigations",
+    "Piercing",
+  ],
+  [
+    "Primary Attributes",
+    "Agility",
+  ],
+  [
+    "Primary Attributes",
+    "Endurance",
+  ],
+]
+
+
+# case sensitive mappings (html name --> desired abbreviation)
+[[equip.abbreviations]]
+stat_path = ["misc", "Block Chance"]
+alias = "BLK"
+
+[[equip.abbreviations]]
+stat_path = ["weapon_damage", "Attack Damage"]
+alias = "ADB"
+
+[[equip.abbreviations]]
+stat_path = ["misc", "Attack Damage"]
+alias = "ADB"
+
+[[equip.abbreviations]]
+stat_path = ["misc", "Magic Damage"]
+alias = "MDB"
+
+[[equip.abbreviations]]
+stat_path = ["misc", "Attack Crit Chance"]
+alias = "Pcrit%"
+
+[[equip.abbreviations]]
+stat_path = ["misc", "Magic Crit Chance"]
+alias = "Mcrit%"
+
+[[equip.abbreviations]]
+stat_path = ["misc", "Attack Crit Damage"]
+alias = "Pcrit Dmg"
+
+[[equip.abbreviations]]
+stat_path = ["misc", "Magic Crit Damage"]
+alias = "Mcrit Dmg"
+
+[[equip.abbreviations]]
+stat_path = ["misc", "Attack Accuracy"]
+alias = "Pacc"
+
+[[equip.abbreviations]]
+stat_path = ["misc", "Magic Accuracy"]
+alias = "Macc"
+
+[[equip.abbreviations]]
+stat_path = ["Proficiency", "Elemental"]
+alias = "Elem Prof"
+
+[[equip.abbreviations]]
+stat_path = ["Proficiency", "Supportive"]
+alias = "Supp Prof"
+
+[[equip.abbreviations]]
+stat_path = ["Proficiency", "Deprecating"]
+alias = "Depr Prof"
+
+[[equip.abbreviations]]
+stat_path = ["Proficiency", "Divine"]
+alias = "Holy Prof"
+
+[[equip.abbreviations]]
+stat_path = ["Proficiency", "Forbidden"]
+alias = "Dark Prof"
+
+[[equip.abbreviations]]
+
+stat_path = ["Primary Attributes", "Wisdom"]
+alias = "WIS"
+
+[[equip.abbreviations]]
+stat_path = ["Primary Attributes", "Intelligence"]
+alias = "INT"
+
+[[equip.abbreviations]]
+stat_path = ["Primary Attributes", "Agility"]
+alias = "AGI"
+
+[[equip.abbreviations]]
+stat_path = ["Primary Attributes", "Endurance"]
+alias = "END"
+
+[[equip.abbreviations]]
+stat_path = ["Primary Attributes", "Strength"]
+alias = "STR"
+
+[[equip.abbreviations]]
+stat_path = ["Primary Attributes", "Dexterity"]
+alias = "DEX"
+
+[[equip.abbreviations]]
+
+stat_path = ["misc", "Interference"]
+alias = "Intf"
+
+[[equip.abbreviations]]
+
+stat_path = ["misc", "Physical Mitigation"]
+alias = "Pmit"
+
+[[equip.abbreviations]]
+stat_path = ["misc", "Magical Mitigation"]
+alias = "Mmit"
+
+[[equip.abbreviations]]
+stat_path = ["Damage Mitigations", "Crushing"]
+alias = "Crush"
+
+[[equip.abbreviations]]
+stat_path = ["Damage Mitigations", "Slashing"]
+alias = "Slash"
+
+[[equip.abbreviations]]
+stat_path = ["Damage Mitigations", "Piercing"]
+alias = "Pierc"
+
+[[equip.abbreviations]]
+stat_path = ["misc", "Parry Chance"]
+alias = "Parry"
+
+[[equip.abbreviations]]
+stat_path = ["misc", "Evade Chance"]
+alias = "Evade"
+
+[[equip.abbreviations]]
+stat_path = ["misc", "Resist Chance"]
+alias = "Resist"
+
+[[equip.abbreviations]]
+stat_path = ["misc", "Counter-Resist"]
+alias = "CR"
+
+[[equip.abbreviations]]
+stat_path = ["misc", "Attack Speed"]
+alias = "AS"
+
+[[equip.abbreviations]]
+stat_path = ["misc", "Casting Speed"]
+alias = "CS"
+
+[[equip.abbreviations]]
+stat_path = ["Spell Damage", "Fire"]
+alias = "Fire EDB"
+
+[[equip.abbreviations]]
+stat_path = ["Spell Damage", "Cold"]
+alias = "Cold EDB"
+
+[[equip.abbreviations]]
+stat_path = ["Spell Damage", "Wind"]
+alias = "Wind EDB"
+
+[[equip.abbreviations]]
+stat_path = ["Spell Damage", "Elec"]
+alias = "Elec EDB"
+
+[[equip.abbreviations]]
+stat_path = ["Spell Damage", "Holy"]
+alias = "Holy EDB"
+
+[[equip.abbreviations]]
+stat_path = ["Spell Damage", "Dark"]
+alias = "Dark EDB"

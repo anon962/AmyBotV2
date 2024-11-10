@@ -40,7 +40,7 @@ def test_equip_inference():
                     diff_percent = abs(actual_percent - expected_percent)
 
                     if stat == "Attack Damage" and data["weapon_damage"]:
-                        base_value = data["weapon_damage"]["damage"]["base"]
+                        base_value = data["weapon_damage"]["Attack Damage"]["base"]
                     else:
                         base_value = data["stats"][cat][stat]["base"]
 

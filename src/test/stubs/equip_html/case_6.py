@@ -7,6 +7,7 @@ data = dict(
     alt_name=None,
     category="One-handed Weapon",
     level="Unassigned",
+    is_tradeable=False,
     condition=dict(
         current=262,
         max=262,
@@ -16,17 +17,17 @@ data = dict(
         current_xp=0,
         max_xp=194,
     ),
-    weapon_damage=dict(
-        status_effects=[
-            "Bleeding Wound : 14.2% chance - 7 turns / 20% DOT",
-        ],
-        damage=dict(
+    weapon_damage={
+        "Attack Damage": dict(
             type="Slashing",
             value=1140,
             base=36.79,
         ),
-        strikes=[],
-    ),
+        "strikes": [],
+        "status_effects": [
+            "Bleeding Wound : 14.2% chance - 7 turns / 20% DOT",
+        ],
+    },
     stats={
         "misc": {
             "Attack Accuracy": dict(

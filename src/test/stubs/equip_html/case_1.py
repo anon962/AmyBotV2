@@ -6,6 +6,7 @@ data = dict(
     alt_name=None,
     category="Staff",
     level=500,
+    is_tradeable=True,
     condition=dict(
         current=519,
         max=523,
@@ -15,19 +16,19 @@ data = dict(
         current_xp=184,
         max_xp=3777,
     ),
-    weapon_damage=dict(
-        damage=dict(
+    weapon_damage={
+        "Attack Damage": dict(
             type="Crushing",
             value=895,
             base=28.86,
         ),
-        strikes=[
+        "strikes": [
             "Dark",
         ],
-        status_effects=[
+        "status_effects": [
             "Ether Tap : 36% chance - 4 turns",
         ],
-    ),
+    },
     stats={
         "misc": {
             "Magic Damage": dict(

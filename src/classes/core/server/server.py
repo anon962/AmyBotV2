@@ -26,7 +26,7 @@ from config.paths import RANGES_FILE
 from utils.html import select_one_or_raise
 from utils.sql import WhereBuilder
 
-HV_FETCH_DELAY_SECONDS = 3
+HV_FETCH_DELAY_SECONDS = 0.5
 RANGE_FETCH_DELAY_SECONDS = 86400 * 3
 
 server = FastAPI()

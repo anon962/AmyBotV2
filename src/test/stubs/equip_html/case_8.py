@@ -7,6 +7,7 @@ data = dict(
     alt_name="IW10 Savage Shadowdancer Bra - J5",
     category="Light Armor",
     level="Soulbound",
+    is_tradeable=False,
     condition=dict(
         current=252,
         max=400,
