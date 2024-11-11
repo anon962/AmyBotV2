@@ -1,6 +1,7 @@
 import re
 from dataclasses import dataclass
 
+import discord
 import requests
 import tomli
 import yarl
@@ -21,7 +22,7 @@ def extract_links(text: str):
     return _extract_links(text) + _extract_legacy_links(text)
 
 
-def on_equip_message(links: list[EquipLink]) -> tuple[list[str], bool]:
+def generate_equip_preview(links: list[EquipLink]) -> tuple[list[str], bool]:
     config = tomli.loads((CONFIG_DIR / "preview_config.toml").read_text())
 
     with_info = []
@@ -300,14 +301,22 @@ def _get_header(info: dict):
 
     lines = []
 
+    name: str = info["name"]
+    if name.lower() == name:
+        name = _capitalize_name(name)
+
     if info["alt_name"]:
+        alt_name: str = info["alt_name"]
+        if alt_name.lower() == alt_name:
+            alt_name = _capitalize_name(alt_name)
+
         # @ Whatever nickname
         # # (Legendary Cobalt Power Gauntlets of Slaughter)
-        lines.append(f'@ {info["alt_name"]}')
-        lines.append(f'# ({info["name"]})')
+        lines.append(f"@ {alt_name}")
+        lines.append(f"# ({name})")
     else:
         # @ Legendary Cobalt Power Gauntlets of Slaughter
-        lines.append(f'@ {info["name"]}')
+        lines.append(f"@ {name}")
 
     # # Level 196 • Tradeable • Owned by Pickled_Cow
     if info["level"] == "Soulbound":
@@ -320,3 +329,16 @@ def _get_header(info: dict):
     lines.append(f"# {status}")
 
     return "\n".join(lines)
+
+
+def _capitalize_name(name: str):
+    words = name.split()
+
+    new_words = []
+    for w in words:
+        if w not in ["of", "the"]:
+            new_words.append(w.capitalize())
+        else:
+            new_words.append(w)
+
+    return " ".join(new_words)

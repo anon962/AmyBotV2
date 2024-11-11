@@ -74,10 +74,10 @@ def _calc_all_percentiles(
 
 def _enumerate_range_path_options_from_name(name: str) -> list[dict]:
     """
-    Equip names are structured as follows:
+    Equip names are structured as:
         quality (prefix) (category) slot (suffix)
 
-    In the percentile range data...
+    In the percentile range data (see below for example)...
     For weapons, the path to the min / max values looks like
         slot -> quality -> stat -> prefix + suffix
     Armor is similar, with an additional category key
@@ -90,6 +90,9 @@ def _enumerate_range_path_options_from_name(name: str) -> list[dict]:
 
     To avoid a giant whitelist of valid words for each key, we'll just try out all combinations.
 
+    ---
+
+    example of range data from reasoningtheory
     {
         "Axe": {
             "Legendary": {

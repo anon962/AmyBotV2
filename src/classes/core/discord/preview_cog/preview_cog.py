@@ -6,9 +6,9 @@ from discord.ext import commands
 from classes.core import discord
 from classes.core.discord import types as types
 from classes.core.discord.discord_watchers import DeleteWatcher, EditWatcher
-from classes.core.discord.preview_cog.on_equip_message import (
+from classes.core.discord.preview_cog.generate_equip_preview import (
     extract_links,
-    on_equip_message,
+    generate_equip_preview,
 )
 from config import logger
 
@@ -21,12 +21,15 @@ class PreviewCog(commands.Cog):
 
     @commands.Cog.listener()
     async def on_message(self, msg: Message):
+        await self.scan_equip_previews(msg)
+
+    async def scan_equip_previews(self, msg: Message):
         links = extract_links(msg.content)
         if not links:
             return
 
         async with msg.channel.typing():
-            equip_previews, has_fail = on_equip_message(links)
+            equip_previews, has_fail = generate_equip_preview(links)
             if has_fail:
                 await msg.add_reaction("❌")
 
