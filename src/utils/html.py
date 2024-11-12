@@ -2,7 +2,7 @@ import functools
 import re
 from typing import TypeAlias
 
-from bs4 import BeautifulSoup, Tag
+from bs4 import BeautifulSoup, NavigableString, PageElement, Tag
 
 Selectable: TypeAlias = BeautifulSoup | Tag
 
@@ -15,7 +15,7 @@ def select_one_or_raise(soup: Selectable, selector: str) -> Tag:
     return el
 
 
-def get_stripped_text(el: Tag):
+def get_stripped_text(el: PageElement):
     text = el.get_text(" ")
     text = text.strip().replace("\xa0", " ")
     text = re.sub(r"\s+", " ", text)
@@ -45,3 +45,10 @@ def get_self_text(el: Tag) -> str:
     assert isinstance(text, str), str(text)
 
     return text
+
+
+def get_attr_or_raise(el: Tag, attr: str) -> str:
+    if attr not in el.attrs:
+        raise ValueError()
+
+    return el.attrs[attr]

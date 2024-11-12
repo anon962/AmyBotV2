@@ -2,9 +2,8 @@
 
 # forum / bounty
 max_body_length = 250
-max_body_lines = 6
 max_title_length = 50
-long_multiplier = 2   # multiply above params by this value when link prefixed with !
+expansion_multiplier = 2 # multiply above params by this value when link prefixed with !
 
 max_tries = 3     # for pages that require login (namely bounties)
 hath_value = 3700

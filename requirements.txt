@@ -5,6 +5,7 @@ fastapi
 hachiko
 loguru
 lxml
+pillow
 requests
 tomlkit
 uvicorn

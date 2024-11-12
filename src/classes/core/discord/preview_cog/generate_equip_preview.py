@@ -18,7 +18,7 @@ class EquipLink:
     is_isekai: bool
 
 
-def extract_links(text: str):
+def extract_equip_links(text: str):
     return _extract_links(text) + _extract_legacy_links(text)
 
 

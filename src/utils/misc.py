@@ -1,7 +1,11 @@
+import io
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any, Callable, TypeAlias
 
+import aiohttp
+import PIL
 import tomlkit
+from PIL import Image
 
 
 def compose_1arg_fns(*fns):
@@ -43,3 +47,33 @@ def split_lst(lst: list, condition: Callable[[Any], bool]) -> list[list]:
         result.append(buffer)
 
     return result
+
+
+PILImage: TypeAlias = Image.Image
+
+
+async def download_image(
+    url: str,
+    headers: dict[str, str] | None = None,
+    chunk_size=8192,
+) -> PILImage:
+    buffer = bytearray()
+    async with aiohttp.ClientSession() as session:
+        resp = await session.get(url, headers=headers or dict())
+        if resp.status != 200:
+            raise ValueError()
+
+        async for chunk in resp.content.iter_chunked(chunk_size):
+            buffer += chunk
+
+    try:
+        im = Image.open(io.BytesIO(buffer))
+    except PIL.UnidentifiedImageError as e:
+        raise ValueError() from e
+
+    try:
+        im.copy().verify()
+    except Exception as e:
+        raise ValueError() from e
+
+    return im
