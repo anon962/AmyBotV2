@@ -23,11 +23,10 @@ from utils.misc import download_image
 LOGGER = loguru.logger.bind(tags=["discord_bot"])
 
 
-def extract_thread_links(text: str):
+def extract_thread_links(text: str) -> list[dict]:
     m_urls: list[tuple[str | None, str]] = re.findall(
         r"(!?)([^\s]+forums\.e-hentai\.org[^\s]*)", text
     )
-    print(m_urls)
 
     threads = []
     for prefix, url_text in m_urls:
@@ -108,6 +107,7 @@ def format_thread_preview(
     post_body = _truncate(
         post_body,
         length_mult * config["max_body_length"],
+        "\n\n[...]",
     )
     post_body = post_body or "(This space intentionally left blank)"
 

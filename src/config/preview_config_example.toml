@@ -6,43 +6,7 @@ max_title_length = 50
 expansion_multiplier = 2 # multiply above params by this value when link prefixed with !
 
 max_tries = 3     # for pages that require login (namely bounties)
-hath_value = 3700
-
-thread_title_template = '''
-  {{TITLE}}
-'''
-
-thread_body_template = '''
-  {{SUB_TITLE}}
-  ```fix
-  {{BODY}}
-  ```
-  by [{{USERNAME}}]({{USER_LINK}}) | {{"%02d"|format(YEAR)}}-{{"%02d"|format(MONTH)}}-{{"%02d"|format(DAY)}} | {{FORUM|truncate(15,True)}}
-'''
-
-comment_title_template = '''
-  {{TITLE}}
-'''
-
-comment_body_template = '''
-  ```fix
-  {{BODY}}
-  ```
-  by [{{USERNAME}}]({{USER_LINK}}) | {{"%02d"|format(YEAR)}}-{{"%02d"|format(MONTH)}}-{{"%02d"|format(DAY)}} | {{FORUM|truncate(15,True)}}
-'''
-
-bounty_title_template = '''
-  {{TITLE}}
-'''
-
-bounty_body_template = '''
-  ```css
-  [ {{TYPE}} | ~{{CREDIT_VALUE}} Credits | {{STATUS}} ]
-
-  {{BODY}}
-  ```
-  by [{{USERNAME}}]({{USER_LINK}}) | {{"%02d-%02d-%02d"|format(YEAR,MONTH,DAY)}}
-'''
+hath_value = 2500
 
 # HV equips
 [equip]
@@ -131,7 +95,10 @@ shade = [
     "Primary Attributes",
     "Endurance",
   ],
-  "attack damage",
+  [
+    "weapon_damage",
+    "Attack Damage",
+  ],
 ]
 plate = [
   [
