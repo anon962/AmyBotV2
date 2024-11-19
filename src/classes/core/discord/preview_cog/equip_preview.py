@@ -324,6 +324,16 @@ def _get_header(info: dict):
         # @ Legendary Cobalt Power Gauntlets of Slaughter
         lines.append(f"@ {name}")
 
+    # # Forge 20 • Juggernaut 5
+    bonuses = []
+    if info["upgrades"]:
+        bonuses.append(f"Forge {max(info['upgrades'].values())}")
+    for enchant, enchant_lvl in info["enchants"].items():
+        bonuses.append(f"{enchant} {enchant_lvl}")
+
+    if bonuses:
+        lines.append("# " + " • ".join(bonuses))
+
     # # Level 196 • Tradeable • Owned by Pickled_Cow
     if info["level"] == "Soulbound":
         status = "Soulbound"
