@@ -133,6 +133,9 @@ def _format_terse_equip_preview(config: dict, info: dict):
 
     for cat, stats in percentiles.items():
         for name, p in stats.items():
+            if p is None:
+                continue
+
             path = [cat, name]
             if path in stats_to_show:
                 continue
@@ -193,6 +196,9 @@ def _format_expanded_equip_preview(config: dict, info: dict):
     other_col: dict = dict(header="Other", vals=[], cells=[])
     for cat, stats in percentiles.items():
         for st, p in stats.items():
+            if p is None:
+                continue
+
             if (cat, st) in seen:
                 continue
 

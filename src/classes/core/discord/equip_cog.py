@@ -5,6 +5,14 @@ from datetime import datetime
 from functools import partial
 from typing import Any, Callable, Literal, Optional
 from unicodedata import name
+
+import requests
+import tomli
+from discord import Interaction, app_commands
+from discord.ext import commands
+from discord.ext.commands import Context
+from yarl import URL
+
 from classes.core import discord
 from classes.core.discord import types as types
 from classes.core.discord.checks import app_check_perms, check_perms
@@ -24,15 +32,11 @@ from classes.core.discord.keywords import (
 )
 from classes.core.discord.table import Col, Table, clip
 from config import logger
+from config.paths import CONFIG_DIR
 from utils.discord import alias_by_prefix, extract_quoted, paginate
 from utils.http import do_get
 from utils.misc import compose_1arg_fns
 from utils.parse import create_equip_link, int_to_price
-from yarl import URL
-
-from discord import Interaction, app_commands
-from discord.ext import commands
-from discord.ext.commands import Context
 
 logger = logger.bind(tags=["discord_bot"])
 
@@ -151,14 +155,15 @@ Everything after the equip name ("peerless staff") is optional
             # Save the rest for later
             if pages_save:
                 trailers.append(
-                    f"{len(pages_save)} pages omitted. Use !more to see the rest.")
+                    f"{len(pages_save)} pages omitted. Use !more to see the rest."
+                )
 
                 self.bot.watcher_cog.register(
                     await MoreWatcher(ctx.channel.id, self.bot, pages_save).__ainit__()
                 )
 
             if trailers:
-                resp = await ctx.send('\n' + '\n'.join(trailers))
+                resp = await ctx.send("\n" + "\n".join(trailers))
                 responses.append(resp.id)
 
             self.bot.watcher_cog.register(
@@ -175,7 +180,7 @@ Everything after the equip name ("peerless staff") is optional
         def parse(
             text: str,
         ) -> tuple[types._Equip.FetchParams, types._Equip.FormatOptions]:
-            text = text.replace("*", " ")
+            text = self._handle_link_request(text) or text.replace("*", " ")
 
             # Pair dict key with prefix / extractor / converter
             parsers: list[
@@ -280,6 +285,29 @@ Everything after the equip name ("peerless staff") is optional
 
         await main()
 
+    def _handle_link_request(self, text: str):
+        m = re.search(
+            r".*hentaiverse\.org/(isekai/)?equip/(\d+)/([A-Za-z\d]{10})", text
+        )
+        if not m:
+            return None
+
+        is_isekai, eid, key = m.groups()
+        is_isekai = bool(is_isekai)
+        eid = int(eid)
+
+        config = tomli.loads((CONFIG_DIR / "preview_config.toml").read_text())
+        api_url = config["equip"]["api_url"]
+        resp = requests.get(
+            f"{api_url}/equip?eid={eid}&key={key}&is_isekai={is_isekai}"
+        )
+        if resp.status_code == 200:
+            data = resp.json()
+        else:
+            return None
+
+        return data["name"]
+
     async def _equip(
         self, params: types._Equip.FetchParams, opts: types._Equip.FormatOptions
     ) -> list[str]:
@@ -338,7 +366,7 @@ Everything after the equip name ("peerless staff") is optional
                 items = sorted(
                     items, key=lambda it: it["auction"]["time"], reverse=True
                 )
-                sales_table = create_sales_table(items)
+                sales_table = create_sales_table(items, is_seller=len(sellers) == 1)
                 item_table = create_item_table(
                     items,
                     show_name=True,
@@ -475,7 +503,7 @@ Everything after the equip name ("peerless staff") is optional
 
             return tbl
 
-        def create_sales_table(items: list[types._Equip.CogEquip]):
+        def create_sales_table(items: list[types._Equip.CogEquip], is_seller=False):
             """Tally earnings for each equip category (eg 1H, Staff, etc)"""
 
             # Calculate total sales for each category
@@ -513,7 +541,7 @@ Everything after the equip name ("peerless staff") is optional
             )
             tbl.add_col(
                 col=Col(
-                    header="Count",
+                    header="Sales" if is_seller else "Purchases",
                     trailer=str(sum(counts.values())),
                     align="right",
                 ),

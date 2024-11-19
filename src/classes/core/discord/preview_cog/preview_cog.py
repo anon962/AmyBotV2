@@ -53,6 +53,9 @@ class PreviewCog(commands.Cog):
 
     @commands.Cog.listener()
     async def on_message(self, msg: Message):
+        if msg.author.id == self.bot.user.id:  # type: ignore
+            return
+
         await self.scan_equip_previews(msg)
         await self.scan_thread_previews(msg)
         await self.scan_bounty_previews(msg)

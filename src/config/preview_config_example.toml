@@ -96,7 +96,7 @@ shade = [
     "Endurance",
   ],
   [
-    "weapon_damage",
+    "misc",
     "Attack Damage",
   ],
 ]
@@ -128,7 +128,7 @@ power = [
     "Endurance",
   ],
   [
-    "weapon_damage",
+    "misc",
     "Attack Damage",
   ],
 ]
