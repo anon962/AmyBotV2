@@ -372,6 +372,7 @@ _FONT_CLASS_MAP = dict(
     c47="7",
     c48="8",
     c49="9",
+    c4g="-",
     c3a="a",
     c3b="b",
     c3c="c",

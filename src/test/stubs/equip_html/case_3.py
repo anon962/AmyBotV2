@@ -3,7 +3,7 @@
 
 data = dict(
     name="legendary onyx power boots of slaughter",
-    alt_name="iw10 power slaughter boots  j3 f3",
+    alt_name="iw10 power slaughter boots - j3 f3",
     category="Heavy Armor",
     level="Soulbound",
     is_tradeable=False,
