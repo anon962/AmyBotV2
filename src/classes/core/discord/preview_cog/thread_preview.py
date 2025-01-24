@@ -107,7 +107,7 @@ def format_thread_preview(
     post_body = _truncate(
         post_body,
         length_mult * config["max_body_length"],
-        "\n\n[...]",
+        "...\n\n[...]",
     )
     post_body = post_body or "(This space intentionally left blank)"
 
@@ -119,7 +119,7 @@ def format_thread_preview(
     date = target_post["date"]
     footer += " | " + date.strftime(r"%Y-%m-%d")
 
-    forum_name = _truncate(thread["forum"]["name"], 15)
+    forum_name = _truncate(thread["forum"]["name"], 25)
     footer += f" | [{forum_name}]({thread['forum']['href']})"
 
     body = sub_title + f"\n```fix\n{post_body}\n```\n" + footer

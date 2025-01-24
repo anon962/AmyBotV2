@@ -1,18 +1,18 @@
-from datetime import datetime, timezone, timedelta
 import json
 import re
+from datetime import datetime, timedelta, timezone
 from typing import Literal
-from aiohttp import ClientSession
 
+from aiohttp import ClientSession
 from bs4 import BeautifulSoup
 from yarl import URL
 
-from classes.db import DB
+from classes.db import init_db
 from config import logger, paths
 from utils.http import create_session, do_get
 from utils.json_cache import JsonCache
-from utils.rate_limit import rate_limit
 from utils.misc import load_toml
+from utils.rate_limit import rate_limit
 
 logger = logger.bind(tags=["lottery"])
 
@@ -65,7 +65,7 @@ class LotteryScraper:
                         try:
                             page = await fetch_page(index, type, session)
                         except ValueError:
-                            logger.info(f"Unable to fetch lottery {type} {index}")
+                            logger.exception(f"Unable to fetch lottery {type} {index}")
                             return
 
                         data = parse_page(page)
@@ -79,8 +79,9 @@ class LotteryScraper:
                         data["date"] = start_date.timestamp()
 
                         # Insert into DB
-                        with DB:
-                            DB.execute(
+                        db = init_db()
+                        with db:
+                            db.execute(
                                 f"""
                                 INSERT INTO {table_name}
                                 (id, date, tickets, "1_prize", "1_user", "1b_prize", "1b_user", "2_prize", "2_user", "3_prize", "3_user", "4_prize", "4_user", "5_prize", "5_user")
@@ -98,9 +99,10 @@ class LotteryScraper:
             last_completed = (now - start).days
 
             # Compare against index in db
-            with DB:
+            db = init_db()
+            with db:
                 table = "lottery_weapon" if type == "weapon" else "lottery_armor"
-                result = DB.execute(
+                result = db.execute(
                     f"""
                     SELECT MAX(id) FROM {table}
                     """
