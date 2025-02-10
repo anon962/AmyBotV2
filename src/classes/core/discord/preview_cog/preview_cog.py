@@ -199,6 +199,9 @@ class PreviewCog(commands.Cog):
             if has_fail:
                 await msg.add_reaction("❌")
 
+    def __hash__(self) -> int:
+        return self.__class__.__name__.__hash__()
+
 
 def _calc_delay(last_fetch: float, min_delay: float):
     # Rate limit
