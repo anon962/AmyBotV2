@@ -334,7 +334,19 @@ Everything after the equip name ("peerless staff") is optional
 
             # Still no results, return error
             if len(items) == 0:
-                msg = "No equips found.\n```yaml\nSearch parameters:"
+                fixed_name = ""
+                fix_count = 0
+                if name := params.get("name", "").strip():
+                    spellcheck = await fetch_spellcheck(self.bot.api_url, name)
+                    fixed_name = spellcheck["name"]
+                    fix_count = spellcheck["correction_count"]
+
+                msg = "No equips found."
+
+                if fix_count > 0:
+                    msg += f" Did you mean `{fixed_name}`?"
+
+                msg += "\n```yaml\nSearch parameters:"
                 for k, v in params.items():
                     msg += f"\n    {k}: {v}"
                 msg += "```"
@@ -715,3 +727,11 @@ def params_to_web_url(params: types._Equip.FetchParams, public_web_url: URL) -> 
         url %= {"buyer_partial": v}
 
     return str(url)
+
+
+async def fetch_spellcheck(api_url: URL, equip_name: str):
+    url = api_url / "spellcheck_equip"
+    url %= dict(name=equip_name)
+
+    resp = await do_get(url, content_type="json")
+    return resp

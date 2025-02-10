@@ -2,13 +2,17 @@ import asyncio
 
 from uvicorn import Config, Server
 
-from classes.core.server.server import create_range_update_task
+from classes.core.server.server import (
+    create_name_dictionary_task,
+    create_range_update_task,
+)
 
 if __name__ == "__main__":
 
     loop = asyncio.new_event_loop()
 
     loop.create_task(create_range_update_task())
+    loop.create_task(create_name_dictionary_task())
 
     server = Server(
         config=Config(

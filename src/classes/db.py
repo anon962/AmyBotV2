@@ -324,6 +324,15 @@ def init_db() -> Db:
 
         db.execute(
             """
+            CREATE TABLE IF NOT EXISTS equip_words (
+                word        TEXT        PRIMARY KEY,
+                count       INTEGER     NOT NULL
+            ) STRICT;
+            """
+        )
+
+        db.execute(
+            """
             CREATE TABLE IF NOT EXISTS metadata (
                 key         TEXT        PRIMARY KEY,
                 value       TEXT        NOT NULL

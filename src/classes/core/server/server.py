@@ -6,11 +6,11 @@ from sqlite3 import Connection
 from typing import Optional
 
 import aiohttp
-import requests
 from bs4 import BeautifulSoup
 from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import PlainTextResponse
+from Levenshtein import distance
 
 from classes.core.server import logger
 from classes.core.server.fetch_equip import LOGGER, fetch_equip_html, parse_equip_html
@@ -21,13 +21,14 @@ from classes.core.server.middleware import (
     PerformanceLog,
     RequestLog,
 )
-from classes.db import init_db, insert_metadata, select_metadata
+from classes.db import Db, init_db, insert_metadata, select_metadata
 from config.paths import RANGES_FILE
 from utils.html import select_one_or_raise
 from utils.sql import WhereBuilder
 
 HV_FETCH_DELAY_SECONDS = 0.5
 RANGE_FETCH_DELAY_SECONDS = 86400 * 3
+NAME_UPDATE_DELAY = 86400 * 1
 
 server = FastAPI()
 
@@ -455,6 +456,33 @@ async def get_equip(
     return data
 
 
+@server.get("/spellcheck_equip")
+async def spellcheck_equip(name: str):
+    db = init_db()
+    name_dict = {
+        r["word"]: r["count"] for r in db.execute("SELECT word, count FROM equip_words")
+    }
+
+    words = name.split()
+    correction = []
+    fix_count = 0
+    for w in words:
+        # prefer title-cased variants
+        w = w[0].upper() + w[1:]
+
+        closest = min(name_dict.keys(), key=lambda k: distance(w, k))
+
+        correction.append(closest)
+
+        if w.lower() not in closest.lower():
+            fix_count += 1
+
+    return dict(
+        name=" ".join(correction),
+        correction_count=fix_count,
+    )
+
+
 def create_range_update_task():
     async def poll_ranges():
         while True:
@@ -493,5 +521,68 @@ def create_range_update_task():
             data = json.loads(script_el["data-itemranges"])  # type: ignore
             RANGES_FILE.write_text(json.dumps(data))
             LOGGER.info("Range update complete")
+
+    return poll_ranges()
+
+
+def create_name_dictionary_task():
+    async def poll_ranges():
+        while True:
+            db = init_db()
+
+            delay = 0
+            last_update = select_metadata(db, "last_name_update")
+
+            # Calculate next update
+            if last_update:
+                last_update = datetime.datetime.fromisoformat(last_update)
+                next_fetch = last_update + datetime.timedelta(seconds=NAME_UPDATE_DELAY)
+                now = datetime.datetime.now()
+
+                if now < next_fetch:
+                    delay = (next_fetch - now).seconds
+                    LOGGER.info(f"Sleeping for {delay}s before name update...")
+                    await asyncio.sleep(delay)
+
+            # Log update time
+            now = datetime.datetime.now()
+            insert_metadata(db, "last_name_update", now.isoformat())
+            db.commit()
+
+            # Run update
+            LOGGER.info("Updating equip name dictionary...")
+            words = tally_words(db)
+
+            db.execute("DELETE FROM equip_words")
+            for word, count in words.items():
+                db.execute(
+                    """
+                    INSERT INTO equip_words (
+                        word, count
+                    ) VALUES (
+                        ?, ?
+                    )
+                    """,
+                    [word, count],
+                )
+            db.commit()
+            LOGGER.info("Dictionary update complete")
+
+    def tally_words(db: Db):
+        rs: list[dict[str, str]] = db.execute(
+            """
+            SELECT json_extract(data, '$.name') name
+            FROM equips
+            """
+        ).fetchall()
+
+        all_words = dict()
+        for r in rs:
+            words = r["name"].split()
+            for w in words:
+                all_words.setdefault(w, 0)
+                all_words[w] += 1
+
+        return all_words
 
     return poll_ranges()
