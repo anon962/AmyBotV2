@@ -6,13 +6,14 @@ from datetime import datetime
 
 import bs4
 from bs4 import BeautifulSoup, Tag
-from classes.db import DB
+from yarl import URL
+
+from classes.db import Db, init_db
 from config import logger, paths
 from utils.http import do_get
 from utils.json_cache import JsonCache
 from utils.parse import parse_equip_link, price_to_int
 from utils.rate_limit import rate_limit
-from yarl import URL
 
 logger = logger.bind(tags=["super"])
 
@@ -36,9 +37,11 @@ class SuperScraper:
     @classmethod
     async def update(cls) -> None:
         async def main():
+            db = init_db()
+
             """Fetch auctions that haven't been parsed yet"""
-            with DB:
-                rows = DB.execute(
+            with db:
+                rows = db.execute(
                     """
                     SELECT id, is_complete FROM super_auctions
                     WHERE last_fetch_time = 0
@@ -54,8 +57,8 @@ class SuperScraper:
                     await cls.scan_auction(r["id"], allow_cached=False)
                 elif r["is_complete"] == 1:
                     # Retry auctions with fails
-                    with DB:
-                        fails = DB.execute(
+                    with db:
+                        fails = db.execute(
                             """
                             SELECT * FROM super_fails
                             WHERE id_auction = ?
@@ -64,18 +67,25 @@ class SuperScraper:
                         ).fetchall()
 
                         if len(fails) > 0:
-                            purge_auction(r["id"], equips=True, mats=True, fails=True)
+                            purge_auction(
+                                db, r["id"], equips=True, mats=True, fails=True
+                            )
                             await cls.scan_auction(r["id"], allow_cached=True)
 
         def purge_auction(
-            id: str, listing=False, equips=False, mats=False, fails=False
+            db: Db,
+            id: str,
+            listing=False,
+            equips=False,
+            mats=False,
+            fails=False,
         ) -> None:
             # fmt: off
-            with DB:
-                if fails: DB.execute("DELETE FROM super_fails WHERE id_auction = ?",(id,),)
-                if equips: DB.execute("DELETE FROM super_equips WHERE id_auction = ?",(id,),)
-                if mats: DB.execute("DELETE FROM super_mats WHERE id_auction = ?",(id,),)
-                if listing: DB.execute("DELETE FROM super_auctions WHERE id = ?",(id,),)
+            with db:
+                if fails: db.execute("DELETE FROM super_fails WHERE id_auction = ?",(id,),)
+                if equips: db.execute("DELETE FROM super_equips WHERE id_auction = ?",(id,),)
+                if mats: db.execute("DELETE FROM super_mats WHERE id_auction = ?",(id,),)
+                if listing: db.execute("DELETE FROM super_auctions WHERE id = ?",(id,),)
             # fmt: on
 
         return await main()
@@ -89,6 +99,8 @@ class SuperScraper:
         """
 
         async def main():
+            db = init_db()
+
             page: str = await do_get(cls.HOME_URL, content_type="text")
             # from test.stubs.super import homepage; page = homepage  # fmt: skip
             soup = BeautifulSoup(page, "lxml")
@@ -97,7 +109,7 @@ class SuperScraper:
             row_data: list[dict] = []
             for el in row_els:
                 data = parse_row(el)
-                insert_db_row(data)
+                insert_db_row(db, data)
                 row_data.append(data)
 
             return row_data
@@ -119,9 +131,9 @@ class SuperScraper:
             data = dict(id=id, title=title, end_time=end_time)
             return data
 
-        def insert_db_row(data: dict) -> None:
-            with DB:
-                DB.execute(
+        def insert_db_row(db: Db, data: dict) -> None:
+            with db:
+                db.execute(
                     """
                     INSERT OR IGNORE INTO super_auctions
                     (id, title, end_time, is_complete, last_fetch_time) VALUES (:id, :title, :end_time, NULL, 0)
@@ -158,7 +170,9 @@ class SuperScraper:
         }
 
         async def main():
-            page = await fetch(auction_id, allow_cached=allow_cached)
+            db = init_db()
+
+            page = await fetch(db, auction_id, allow_cached=allow_cached)
             trs = page.select("tbody > tr")
             rows: list[list[_Cell]] = []
             for tr in trs:
@@ -174,11 +188,11 @@ class SuperScraper:
                     item_data.append(data)
                 except:
                     logger.exception(f"Failed to parse {cells}")
-                    with DB:
+                    with db:
                         item_code = cells[0].text
                         item_name = cells[1].text
                         tr = trs[rows.index(cells)]
-                        DB.execute(
+                        db.execute(
                             """
                             INSERT OR REPLACE INTO super_fails
                             (id, id_auction, summary, html) VALUES (?, ?, ?, ?)
@@ -187,10 +201,10 @@ class SuperScraper:
                         )
 
             # Update item data in db
-            with DB:
+            with db:
                 for item in item_data:
                     if item["_type"] == "equip":
-                        DB.execute(
+                        db.execute(
                             """
                             INSERT OR REPLACE INTO super_equips 
                             (id, id_auction, name, eid, key, is_isekai, level, stats, price, bid_link, next_bid, buyer, seller)
@@ -199,7 +213,7 @@ class SuperScraper:
                             item,
                         )
                     else:
-                        DB.execute(
+                        db.execute(
                             """
                             INSERT OR REPLACE INTO super_mats 
                             (id, id_auction, name, quantity, unit_price, price, bid_link, next_bid, buyer, seller)
@@ -209,11 +223,11 @@ class SuperScraper:
                         )
 
             # Update auction status in db
-            with DB:
+            with db:
                 is_complete = "Auction ended" in page.select_one("#timing").text  # type: ignore
                 is_complete = int(is_complete)
-                with DB:
-                    DB.execute(
+                with db:
+                    db.execute(
                         """
                         UPDATE super_auctions
                         SET is_complete = ?
@@ -222,7 +236,7 @@ class SuperScraper:
                         (is_complete, auction_id),
                     )
 
-        async def fetch(id: str, allow_cached=False) -> BeautifulSoup:
+        async def fetch(db: Db, id: str, allow_cached=False) -> BeautifulSoup:
             path = f"itemlist{id}"
 
             if not allow_cached or path not in cls.html_cache:
@@ -232,8 +246,8 @@ class SuperScraper:
                 cls.HTML_CACHE_FILE.dump(cls.html_cache)
 
                 # Update db
-                with DB:
-                    DB.execute(
+                with db:
+                    db.execute(
                         """
                         UPDATE super_auctions SET
                             last_fetch_time = ?
