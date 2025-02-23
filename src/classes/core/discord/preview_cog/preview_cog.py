@@ -24,6 +24,7 @@ from classes.core.discord.preview_cog.equip_preview import (
 )
 from classes.core.discord.preview_cog.thread_preview import (
     extract_thread_links,
+    fetch_super_auction_info,
     fetch_thread,
     fetch_user_thumbnail,
     find_target_post,
@@ -116,9 +117,27 @@ class PreviewCog(commands.Cog):
                 soup, url = r
                 thread = parse_thread(soup)
 
+                target_post = find_target_post(thread, m["pid"]) or thread["posts"][0]
+
+                auction_info = None
+                if (
+                    "auction" in thread["title"].lower()
+                    and target_post is thread["posts"][0]
+                    and target_post["author"]["name"] == "Superlatanium"
+                ):
+                    try:
+                        auction_info = await fetch_super_auction_info(
+                            self.bot.api_url, m["tid"]
+                        )
+                    except Exception:
+                        LOGGER.exception("Preview for super auction failed")
+
                 # Format embed text
                 title, description = format_thread_preview(
-                    thread, m["is_expanded"], m["pid"]
+                    thread,
+                    auction_info,
+                    m["is_expanded"],
+                    m["pid"],
                 )
 
                 embed = Embed(
@@ -129,7 +148,6 @@ class PreviewCog(commands.Cog):
 
                 # Add thumbnail
                 file = None
-                target_post = find_target_post(thread, m["pid"]) or thread["posts"][0]
                 thumbnail = await fetch_user_thumbnail(target_post["author"]["uid"])
                 if thumbnail:
                     embed.set_thumbnail(url="attachment://image.png")

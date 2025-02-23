@@ -1,5 +1,5 @@
 import sqlite3
-from typing import Type, TypeAlias
+from typing import TypeAlias
 
 from config import paths
 
@@ -7,7 +7,7 @@ Db: TypeAlias = sqlite3.Connection
 
 
 def init_db() -> Db:
-    db = sqlite3.connect(paths.DATA_DIR / "db.sqlite")
+    db = sqlite3.connect(paths.DB_FILE)
 
     db.row_factory = sqlite3.Row
 

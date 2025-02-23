@@ -10,6 +10,11 @@ import yarl
 from bs4 import BeautifulSoup, Tag
 from PIL import Image
 
+from classes.core.discord import types
+from classes.core.discord.equip_cog import fetch_equips
+from classes.core.discord.table import Col, Table
+from classes.scrapers.super_scraper import SuperScraper
+from config import paths
 from config.paths import CONFIG_DIR
 from utils.html import (
     first,
@@ -81,6 +86,7 @@ def extract_thread_links(text: str) -> list[dict]:
 
 def format_thread_preview(
     thread: dict,
+    auction_info: list[types._Equip.CogEquip] | None,
     is_expanded: bool,
     target_pid: int | None = None,
 ):
@@ -125,7 +131,12 @@ def format_thread_preview(
     forum_name = _truncate(thread["forum"]["name"], 25)
     footer += f" | [{forum_name}]({thread['forum']['href']})"
 
-    body = sub_title + f"\n```fix\n{post_body}\n```\n" + footer
+    auction_body = ""
+    if auction_info:
+        auction_body = format_auction_info(auction_info)
+        auction_body = f"```ts\n\n{auction_body}\n```"
+
+    body = sub_title + f"\n```fix\n{post_body}\n```" + auction_body + "\n" + footer
 
     return title, body
 
@@ -309,3 +320,69 @@ def find_target_post(thread: dict, pid: int | None) -> dict:
     posts_by_pid = {p["pid"]: p for p in thread["posts"]}
     target_post = posts_by_pid.get(pid, None)
     return target_post
+
+
+# @todo: accessing server db from bot is gross
+async def fetch_super_auction_info(api_url: yarl.URL, id_auction: str):
+    if not paths.DB_FILE.exists():
+        return
+
+    await SuperScraper.refresh_list()
+    await SuperScraper.update()
+
+    params = types._Equip.FetchParams()
+    params["id_auction"] = id_auction
+    params["is_incomplete"] = True
+    equips = await fetch_equips(api_url, params)
+
+    return equips
+
+
+def format_auction_info(equips: list[types._Equip.CogEquip]) -> str:
+    cats: list[dict] = [
+        dict(prefix="One", name="1H", num_leg=0, num_peerl=0, num_other=0),
+        dict(prefix="Two", name="2H", num_leg=0, num_peerl=0, num_other=0),
+        dict(prefix="Sta", name="Staff", num_leg=0, num_peerl=0, num_other=0),
+        dict(prefix="Shd", name="Shield", num_leg=0, num_peerl=0, num_other=0),
+        dict(prefix="Clo", name="Cloth", num_leg=0, num_peerl=0, num_other=0),
+        dict(prefix="Lig", name="Light", num_leg=0, num_peerl=0, num_other=0),
+        dict(prefix="Hea", name="Heavy", num_leg=0, num_peerl=0, num_other=0),
+    ]
+
+    total_cat: dict = dict(name="Total", num_leg=0, num_peerl=0, num_other=0)
+
+    for eq in equips:
+        for cat in cats:
+            if eq["id"].startswith(cat["prefix"]):
+                key = None
+                if eq["name"].startswith("Peerless"):
+                    key = "num_peerl"
+                elif eq["name"].startswith("Legendary"):
+                    key = "num_leg"
+                else:
+                    key = "num_other"
+
+                cat[key] += 1
+                total_cat[key] += 1
+
+                break
+
+    tbl = Table(draw_col_trailers=True)
+    tbl.add_col(
+        Col("", trailer="Total"),
+        [cat["name"] for cat in cats],
+    )
+    tbl.add_col(
+        Col("Peerl.", align="right", trailer=str(total_cat["num_peerl"])),
+        [str(cat["num_peerl"]) if cat["num_peerl"] else "-" for cat in cats],
+    )
+    tbl.add_col(
+        Col("Leg.", align="right", trailer=str(total_cat["num_leg"])),
+        [str(cat["num_leg"]) if cat["num_leg"] else "-" for cat in cats],
+    )
+    tbl.add_col(
+        Col("Other", align="right", trailer=str(total_cat["num_other"])),
+        [str(cat["num_other"]) if cat["num_other"] else "-" for cat in cats],
+    )
+
+    return tbl.print()

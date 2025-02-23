@@ -9,6 +9,7 @@ CACHE_DIR = DATA_DIR / "cache"
 LOG_DIR = DATA_DIR / "logs"
 PERMS_DIR = DATA_DIR / "perms"
 
+DB_FILE = DATA_DIR / "db.sqlite"
 RANGES_FILE = DATA_DIR / "ranges.json"
 SECRETS_FILE = CONFIG_DIR / "secrets.toml"
 DISCORD_CONFIG = CONFIG_DIR / "discord_config.toml"

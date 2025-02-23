@@ -12,6 +12,8 @@ class _Equip:
         seller_partial: str | None
         buyer: str | None
         buyer_partial: str | None
+        id_auction: str | None
+        is_incomplete: bool | None
 
     @dataclass
     class FormatOptions:
@@ -26,6 +28,7 @@ class _Equip:
         title: str
 
     class CogEquip(TypedDict):
+        id: str
         name: str
         eid: int
         key: str

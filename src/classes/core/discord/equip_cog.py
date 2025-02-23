@@ -316,20 +316,20 @@ Everything after the equip name ("peerless staff") is optional
             warning_params = None
             params_ = params.copy()
             opts_ = copy.deepcopy(opts)
-            items = await _fetch_equips(self.bot.api_url, params_)
+            items = await fetch_equips(self.bot.api_url, params_)
 
             # If no results, allow partial seller
             if len(items) == 0 and params.get("seller"):
                 params_["seller_partial"] = params.get("seller")
                 del params_["seller"]
-                items = await _fetch_equips(self.bot.api_url, params_)
+                items = await fetch_equips(self.bot.api_url, params_)
                 warning_params = f'Hint: Try using quotes if you are looking for a name containing a space (eg `seller"amy bot"`)'
 
             # If no results, allow partial buyer
             if len(items) == 0 and params.get("buyer"):
                 params_["buyer_partial"] = params.get("buyer")
                 del params_["buyer"]
-                items = await _fetch_equips(self.bot.api_url, params_)
+                items = await fetch_equips(self.bot.api_url, params_)
                 warning_params = f'Hint: Try using quotes if you are looking for a name containing a space (eg `buyer"amy bot"`)'
 
             # Still no results, return error
@@ -599,7 +599,7 @@ Everything after the equip name ("peerless staff") is optional
         return self.__class__.__name__.__hash__()
 
 
-async def _fetch_equips(
+async def fetch_equips(
     api_url: URL,
     params: types._Equip.FetchParams,
 ) -> list[types._Equip.CogEquip]:
@@ -627,14 +627,16 @@ async def _fetch_equips(
         "seller_partial",
         "buyer",
         "buyer_partial",
+        "id_auction",
     ]
     for k in keys:
         if (v := params.get(k)) is not None:
             ep_super %= {k: str(v).strip()}
             ep_kedama %= {k: str(v).strip()}
 
-    # Ignore on-going auctions
-    ep_super %= dict(complete="true")
+    if not params.get("is_incomplete"):
+        # Ignore on-going auctions
+        ep_super %= dict(complete="true")
 
     super_data = await do_get(ep_super, content_type="json")
     kedama_data = await do_get(ep_kedama, content_type="json")

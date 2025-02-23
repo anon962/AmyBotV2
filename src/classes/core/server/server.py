@@ -65,6 +65,7 @@ def get_super_equips(
     buyer: Optional[str] = None,
     buyer_partial: Optional[str] = None,
     complete: Optional[bool] = None,
+    id_auction: Optional[str] = None,
     db: Connection = Depends(init_db),
 ):
     """Search for items sold at a Super auction
@@ -128,7 +129,11 @@ def get_super_equips(
 
     # Create completion filter
     if complete is not None:
-        where_builder.add("sa_is_complete = ?", int(complete))
+        where_builder.add("sa.is_complete = ?", int(complete))
+
+    # Auciton filter
+    if id_auction is not None:
+        where_builder.add("sa.id = ?", id_auction)
 
     # Query DB
     with db:
@@ -174,6 +179,7 @@ def get_kedama_equips(
     seller_partial: Optional[str] = None,
     buyer: Optional[str] = None,
     buyer_partial: Optional[str] = None,
+    id_auction: Optional[str] = None,
     db: Connection = Depends(init_db),
 ):
     """Search for items sold at a Kedama auction
@@ -235,6 +241,10 @@ def get_kedama_equips(
         for fragment in fragments:
             where_builder.add("seller LIKE ?", f"%{fragment}%")
 
+    # Auciton filter
+    if id_auction is not None:
+        where_builder.add("list.id = ?", id_auction)
+
     # Query DB
     with db:
         where, data = where_builder.print()
@@ -267,6 +277,11 @@ def get_kedama_equips(
 
     # Return
     return result
+
+
+@server.get("/super/auction")
+def get_super_auction():
+    pass
 
 
 @server.get("/lottery/search")

@@ -221,8 +221,9 @@ class Table:
         """Column width excluding padding (ie length of longest string in column)"""
 
         title = self.cols[idx].header if self.cols else ""
+        trailer = self.cols[idx].trailer if self.cols else ""
         cells = [self.cols[idx].stringify(cell) for cell in self.get_col(idx)]
-        lengths = [len(title)] + [len(c) for c in cells]
+        lengths = [len(title)] + [len(c) for c in cells] + [len(trailer)]
         result = max(lengths)
         return result
 
