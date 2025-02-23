@@ -1,10 +1,12 @@
 import functools
 import re
-from typing import TypeAlias
+from typing import TypeAlias, TypeVar
 
 from bs4 import BeautifulSoup, NavigableString, PageElement, Tag
 
 Selectable: TypeAlias = BeautifulSoup | Tag
+
+T = TypeVar("T")
 
 
 def select_one_or_raise(soup: Selectable, selector: str) -> Tag:
@@ -36,7 +38,7 @@ def has_class(el: Tag, cls: str):
 
 
 def get_children(el: Tag):
-    return el.findChildren(recursive=False)
+    return list(el.findChildren(recursive=False))
 
 
 def get_self_text(el: Tag) -> str:
@@ -52,3 +54,14 @@ def get_attr_or_raise(el: Tag, attr: str) -> str:
         raise ValueError()
 
     return el.attrs[attr]
+
+
+def get_tag(el: Tag) -> str:
+    return el.name.lower()
+
+
+def first(xs: list[T]) -> T | None:
+    if len(xs):
+        return xs[0]
+    else:
+        return None

@@ -12,9 +12,12 @@ from PIL import Image
 
 from config.paths import CONFIG_DIR
 from utils.html import (
+    first,
     get_attr_or_raise,
+    get_children,
     get_self_text,
     get_stripped_text,
+    get_tag,
     search_or_raise,
     select_one_or_raise,
 )
@@ -97,10 +100,10 @@ def format_thread_preview(
     for p in target_post["body_parts"]:
         if p["type"] in ["quotetop", "quotemain"]:
             body_parts.append(f"[quote]...[/quote]")
-        elif p["type"] in ["edit"]:
+        elif p["type"] in ["edit", "img"]:
             pass
-        else:
-            body_parts.append(p["text"])
+        elif p["text"].strip():
+            body_parts.append(p["text"].strip())
 
     post_body = "\n".join(body_parts)
     post_body = re.sub("\n\n", "\n", post_body)
@@ -210,7 +213,7 @@ def _parse_post(post_el: Tag) -> dict:
     body_parts = []
     body_el = select_one_or_raise(post_el, ".postcolor")
     for child_el in body_el.contents:
-        part_type = "plaintext"
+        part_type = None
         if isinstance(child_el, Tag):
             classes = child_el.get("class", [])
             if "quotetop" in classes:
@@ -219,6 +222,19 @@ def _parse_post(post_el: Tag) -> dict:
                 part_type = "quotemain"
             elif "edit" in classes:
                 part_type = "edit"
+
+            if not part_type:
+                has_img = get_stripped_text(child_el).startswith("(IMG:")
+
+                grandchildren = get_children(child_el)
+                has_img |= any(
+                    get_tag(el) == "img" for el in [child_el, *grandchildren]
+                )
+
+                if has_img:
+                    part_type = "img"
+
+        part_type = part_type or "plaintext"
 
         body_parts.append(
             dict(
