@@ -153,7 +153,7 @@ def _format_terse_equip_preview(config: dict, info: dict):
         p = _get_percentile(percentiles, path[0], path[1])
 
         if p is not None:
-            stat_strs.append(f"{name} {round(p)}")
+            stat_strs.append(f"{name} {round(p*100)}%")
 
     msg = _get_header(info)
     msg += "\n" + ", ".join(stat_strs)
@@ -218,7 +218,7 @@ def _format_expanded_equip_preview(config: dict, info: dict):
     #   56% INT
     #   62% WIS
     for col in cols:
-        p_strs = [f'{round(c["p"])}' for c in col["vals"]]
+        p_strs = [f'{round(c["p"]*100)}%' for c in col["vals"]]
         max_width = max(len(x) for x in p_strs)
         col["cells"] = [
             f"{p_str:>{max_width}} {c['name']}" for p_str, c in zip(p_strs, col["vals"])

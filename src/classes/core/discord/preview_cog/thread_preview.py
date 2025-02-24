@@ -123,7 +123,15 @@ def format_thread_preview(
     # by qw3rty67 | 2018-01-15 | The HentaiVerse Chat
     author = target_post["author"]
     author_url = f'https://forums.e-hentai.org/index.php?showuser={author["uid"]}'
-    footer = f"by [{author['name']}]({author_url})"
+
+    author_emoji = ""
+    if auction_info:
+        author_emoji = "<:super:1343214468561244270>"
+
+    if auction_info:
+        footer = f"by {author_emoji} [{author['name']}]({author_url})"
+    else:
+        footer = f"by [{author['name']}]({author_url})"
 
     date = target_post["date"]
     footer += " | " + date.strftime(r"%Y-%m-%d")

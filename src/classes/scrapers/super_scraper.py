@@ -51,6 +51,8 @@ class SuperScraper:
                 ).fetchall()
 
             for r in rows:
+                logger.info(f"Scanning {json.dumps(dict(r), indent=2)}")
+
                 if r["is_complete"] is None:
                     await cls.scan_auction(r["id"], allow_cached=True)
                 elif r["is_complete"] == 0:

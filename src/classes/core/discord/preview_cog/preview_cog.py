@@ -149,7 +149,7 @@ class PreviewCog(commands.Cog):
                 # Add thumbnail
                 file = None
                 thumbnail = await fetch_user_thumbnail(target_post["author"]["uid"])
-                if thumbnail:
+                if thumbnail and not auction_info:
                     embed.set_thumbnail(url="attachment://image.png")
                     file = _get_thumbnail_file(thumbnail["im"])
 
