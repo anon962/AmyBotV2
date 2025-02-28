@@ -182,7 +182,8 @@ async def fetch_thread(
 
 async def fetch_user_thumbnail(uid: int) -> dict | None:
     candidates = [
-        f"https://forums.e-hentai.org/uploads/av-{uid}.{ext}" for ext in ["jpg", "png"]
+        f"https://forums.e-hentai.org/uploads/av-{uid}.{ext}"
+        for ext in ["jpeg", "jpg", "png", "gif"]
     ]
 
     for url in candidates:

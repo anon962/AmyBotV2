@@ -279,11 +279,6 @@ def get_kedama_equips(
     return result
 
 
-@server.get("/super/auction")
-def get_super_auction():
-    pass
-
-
 @server.get("/lottery/search")
 def get_lottery(
     equip: Optional[str] = None,
