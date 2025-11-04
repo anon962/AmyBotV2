@@ -57,6 +57,7 @@ def parse_equip_html(html: str) -> dict:
     owner = _parse_owner(soup)
 
     return dict(
+        is_beta=False,
         name=name,
         alt_name=alt_name,
         category=category,

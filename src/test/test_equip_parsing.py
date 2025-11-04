@@ -1,7 +1,7 @@
 from test.stubs import equip_html
 from test.stubs.equip_html.ranges import TEST_RANGES
 
-from classes.core.server.fetch_equip import parse_equip_html
+from classes.core.server.equip_parser import parse_equip_html
 from classes.core.server.infer_equip_stats import infer_equip_stats
 
 

@@ -12,8 +12,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import PlainTextResponse
 from Levenshtein import distance
 
-from classes.core.server import logger
-from classes.core.server.fetch_equip import LOGGER, fetch_equip_html, parse_equip_html
+from classes.core.server import equip_parser, equip_parser_beta, logger
+from classes.core.server.equip_parser import LOGGER, fetch_equip_html
 from classes.core.server.infer_equip_stats import infer_equip_stats
 from classes.core.server.middleware import (
     ErrorLog,
@@ -448,20 +448,27 @@ async def get_equip(
     if resp.text in ["Nope", "No such item"]:
         raise HTTPException(404)
 
-    data = parse_equip_html(resp.text)
-    data["calculations"] = infer_equip_stats(data)
+    if not is_isekai:
+        data = equip_parser.parse_equip_html(resp.text)
+        data["calculations"] = infer_equip_stats(data)
 
-    db.execute(
-        """
-        INSERT OR REPLACE INTO equips (
-            id, key, updated_at, data
-        ) VALUES (
-            ?, ?, ?, ?
+        db.execute(
+            """
+            INSERT OR REPLACE INTO equips (
+                id, key, updated_at, data
+            ) VALUES (
+                ?, ?, ?, ?
+            )
+            """,
+            [eid, key, now.isoformat(), json.dumps(data)],
         )
-        """,
-        [eid, key, now.isoformat(), json.dumps(data)],
-    )
-    db.commit()
+        db.commit()
+    else:
+        data = equip_parser_beta.parse_equip_html(resp.text)
+        data["calculations"] = dict(
+            percentiles=dict(),
+            legendary_percentiles=dict(),
+        )
 
     return data
 

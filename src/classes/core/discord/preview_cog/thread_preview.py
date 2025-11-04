@@ -1,14 +1,12 @@
-import asyncio
 import datetime
 import re
-from dataclasses import dataclass
+from typing import Any
 
 import aiohttp
 import loguru
 import tomli
 import yarl
 from bs4 import BeautifulSoup, Tag
-from PIL import Image
 
 from classes.core.discord import types
 from classes.core.discord.equip_cog import fetch_equips
@@ -17,7 +15,6 @@ from classes.scrapers.super_scraper import SuperScraper
 from config import paths
 from config.paths import CONFIG_DIR
 from utils.html import (
-    first,
     get_attr_or_raise,
     get_children,
     get_self_text,
@@ -91,7 +88,12 @@ def format_thread_preview(
     target_pid: int | None = None,
 ):
     config = tomli.loads((CONFIG_DIR / "preview_config.toml").read_text())
-    target_post = find_target_post(thread, target_pid) or thread["posts"][0]
+    target = find_target_post(thread, target_pid)
+    if not target:
+        target = dict(
+            index=0,
+            post=thread["posts"][0],
+        )
 
     length_mult = config["expansion_multiplier"] if is_expanded else 1
 
@@ -103,7 +105,7 @@ def format_thread_preview(
     sub_title = thread["description"]
 
     body_parts = []
-    for p in target_post["body_parts"]:
+    for p in target["post"]["body_parts"]:
         if p["type"] in ["quotetop", "quotemain"]:
             body_parts.append(f"[quote]...[/quote]")
         elif p["type"] in ["edit", "img"]:
@@ -121,7 +123,7 @@ def format_thread_preview(
     post_body = post_body or "(This space intentionally left blank)"
 
     # by qw3rty67 | 2018-01-15 | The HentaiVerse Chat
-    author = target_post["author"]
+    author = target["post"]["author"]
     author_url = f'https://forums.e-hentai.org/index.php?showuser={author["uid"]}'
 
     author_emoji = ""
@@ -133,7 +135,9 @@ def format_thread_preview(
     else:
         footer = f"by [{author['name']}]({author_url})"
 
-    date = target_post["date"]
+    footer = f'#{target["index"] + 1} ' + footer
+
+    date = target["post"]["date"]
     footer += " | " + date.strftime(r"%Y-%m-%d")
 
     forum_name = _truncate(thread["forum"]["name"], 25)
@@ -325,8 +329,10 @@ def _truncate(text: str, max_length: int, trailer="..."):
     return text
 
 
-def find_target_post(thread: dict, pid: int | None) -> dict:
-    posts_by_pid = {p["pid"]: p for p in thread["posts"]}
+def find_target_post(thread: dict, pid: int | None) -> dict[str, Any] | None:
+    posts_by_pid: dict = {
+        p["pid"]: dict(index=idx, post=p) for idx, p in enumerate(thread["posts"])
+    }
     target_post = posts_by_pid.get(pid, None)
     return target_post
 

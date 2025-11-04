@@ -117,13 +117,18 @@ class PreviewCog(commands.Cog):
                 soup, url = r
                 thread = parse_thread(soup)
 
-                target_post = find_target_post(thread, m["pid"]) or thread["posts"][0]
+                target = find_target_post(thread, m["pid"])
+                if not target:
+                    target = dict(
+                        index=0,
+                        post=thread["posts"][0],
+                    )
 
                 auction_info = None
                 if (
                     "auction" in thread["title"].lower()
-                    and target_post is thread["posts"][0]
-                    and target_post["author"]["name"] == "Superlatanium"
+                    and target is thread["posts"][0]
+                    and target["post"]["author"]["name"] == "Superlatanium"
                 ):
                     try:
                         auction_info = await fetch_super_auction_info(
@@ -149,7 +154,9 @@ class PreviewCog(commands.Cog):
                 # Add thumbnail
                 file = None
                 if not auction_info:
-                    thumbnail = await fetch_user_thumbnail(target_post["author"]["uid"])
+                    thumbnail = await fetch_user_thumbnail(
+                        target["post"]["author"]["uid"]
+                    )
 
                     if thumbnail:
                         embed.set_thumbnail(url="attachment://image.png")

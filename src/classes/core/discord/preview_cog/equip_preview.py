@@ -1,7 +1,7 @@
 import re
+import traceback
 from dataclasses import dataclass
 
-import discord
 import requests
 import tomli
 import yarl
@@ -26,29 +26,32 @@ def generate_equip_preview(links: list[EquipLink]) -> tuple[list[str], bool]:
     config = tomli.loads((CONFIG_DIR / "preview_config.toml").read_text())
 
     with_info = []
-    has_fail = False
     for l in links:
         d = _fetch_equip_info(config["equip"]["api_url"], l.eid, l.key, l.is_isekai)
         with_info.append(dict(link=l, info=d))
 
         if d is None:
-            has_fail = True
+            return [], True
 
-    previews = []
-    for d in with_info:
-        if d["link"].is_expanded:
-            previews.append(
-                _format_expanded_equip_preview(config, d["info"]),
-            )
-        else:
-            previews.append(
-                _format_terse_equip_preview(
-                    config,
-                    d["info"],
+    try:
+        previews = []
+        for d in with_info:
+            if d["link"].is_expanded:
+                previews.append(
+                    _format_expanded_equip_preview(config, d["info"]),
                 )
-            )
+            else:
+                previews.append(
+                    _format_terse_equip_preview(
+                        config,
+                        d["info"],
+                    )
+                )
+    except Exception:
+        traceback.print_exc()
+        return [], True
 
-    return previews, has_fail
+    return previews, False
 
 
 def _extract_links(text: str) -> list[EquipLink]:
@@ -196,8 +199,8 @@ def _format_expanded_equip_preview(config: dict, info: dict):
     other_col: dict = dict(header="Other", vals=[], cells=[])
     for cat, stats in percentiles.items():
         for st, p in stats.items():
-            if p is None:
-                continue
+            # if p is None:
+            #     continue
 
             if (cat, st) in seen:
                 continue
@@ -218,7 +221,10 @@ def _format_expanded_equip_preview(config: dict, info: dict):
     #   56% INT
     #   62% WIS
     for col in cols:
-        p_strs = [f'{round(c["p"]*100)}%' for c in col["vals"]]
+        p_strs = [
+            f'{round(c["p"]*100)}%' if c["p"] is not None else "???"
+            for c in col["vals"]
+        ]
         max_width = max(len(x) for x in p_strs)
         col["cells"] = [
             f"{p_str:>{max_width}} {c['name']}" for p_str, c in zip(p_strs, col["vals"])
@@ -342,6 +348,10 @@ def _get_header(info: dict):
     else:
         status = f'Level {info["level"]} • Untradeable'
     status = status + " • " + f"Owned by {info['owner']['name']}"
+
+    if info["owner"]["source_name"]:
+        status += " • " + f"Dropped by {info['owner']['source_name']}"
+
     lines.append(f"# {status}")
 
     return "\n".join(lines)

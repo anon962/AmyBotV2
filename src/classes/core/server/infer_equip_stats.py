@@ -23,6 +23,7 @@ def infer_equip_stats(
     )
 
 
+@LOGGER.catch(reraise=True)
 def _calc_all_percentiles(
     equip: dict,
     ranges_override: dict | None = None,
