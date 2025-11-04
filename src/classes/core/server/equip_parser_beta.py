@@ -1,4 +1,3 @@
-import json
 import re
 from typing import cast
 
@@ -6,6 +5,7 @@ import loguru
 from bs4 import BeautifulSoup, Tag
 from soupsieve import select_one
 
+from classes.core.server.parse_equip_name import parse_equip_name
 from utils.html import (
     get_children,
     get_self_text,
@@ -21,6 +21,7 @@ def parse_equip_html(html: str) -> dict:
     soup = BeautifulSoup(html, "lxml")
 
     name, alt_name = _parse_name(soup)
+    name_parts = parse_equip_name(name)
     category, level, is_tradeable = _parse_equip_category(soup)
     status = _parse_status(soup)
     weapon_damage = _parse_weapon_damage(soup)
@@ -33,6 +34,7 @@ def parse_equip_html(html: str) -> dict:
     result = dict(
         is_beta=True,
         name=name,
+        name_parts=name_parts,
         alt_name=alt_name,
         category=category,
         level=level,
@@ -48,7 +50,6 @@ def parse_equip_html(html: str) -> dict:
         **status,
     )
 
-    LOGGER.info(json.dumps(result, indent=2))
     return result
 
 
@@ -153,7 +154,9 @@ def _parse_weapon_damage(soup: BeautifulSoup) -> dict | None:
             damage_base = float(m_base.group(1))
 
             d["Attack Damage"] = dict(
-                type=damage_type, value=damage_value, base=damage_base
+                type=damage_type,
+                value=damage_value,
+                base=damage_base,
             )
             continue
 
@@ -186,10 +189,10 @@ def _parse_misc_stats(soup: BeautifulSoup):
         if not children:
             continue
 
-        if getattr(el, "title"):
+        if "title" in el.attrs:
             m_base = search_or_raise(
                 r"Base: (\d+(?:\.\d+)?)",
-                cast(str, el["title"]),
+                cast(str, el.attrs["title"]),
             )
             base_value = float(m_base.group(1))
         else:
@@ -235,10 +238,10 @@ def _parse_single_cat_stat(el: Tag):
     children = get_children(el)
     assert len(children) == 2, children
 
-    if getattr(el, "title"):
+    if "title" in el.attrs:
         m_base = search_or_raise(
             r"Base: (\d+(?:\.\d+)?)",
-            cast(str, el["title"]),
+            cast(str, el.attrs["title"]),
         )
         base_value = float(m_base.group(1))
     else:
@@ -305,6 +308,14 @@ def _parse_owner(soup: BeautifulSoup):
     )
     source_date = children[0].getText().split()[-1]
 
+    source_mob = None
+    source_mob_match = re.search(
+        r"^Dropped by (.*) for$",
+        children[0].contents[0].get_text().strip(),
+    )
+    if source_mob_match:
+        source_mob = source_mob_match.group(1)
+
     owner_el = select_one("a", children[1])
     if owner_el:
         owner_name = get_stripped_text(owner_el)
@@ -324,4 +335,5 @@ def _parse_owner(soup: BeautifulSoup):
         date=source_date,
         source_name=source_name,
         source_uid=source_uid,
+        source_mob=source_mob,
     )

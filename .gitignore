@@ -6,6 +6,7 @@ src/config/secrets.toml
 src/data/cache/
 src/data/perms/*.toml
 src/data/ranges.json
+src/data/tmp
 venv/
 
 *.invalid

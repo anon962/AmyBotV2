@@ -1,6 +1,6 @@
 import io
 from pathlib import Path
-from typing import Any, Callable, TypeAlias
+from typing import Any, Callable, Iterable, TypeAlias
 
 import aiohttp
 import PIL
@@ -77,3 +77,14 @@ async def download_image(
         raise ValueError() from e
 
     return im
+
+
+def get_tally(xs: Iterable, fn):
+    counts = dict()
+
+    for x in xs:
+        k, v = fn(x)
+        counts.setdefault(k, [])
+        counts[k].append(v)
+
+    return counts

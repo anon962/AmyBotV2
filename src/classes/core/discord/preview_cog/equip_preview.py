@@ -122,7 +122,7 @@ def _format_terse_equip_preview(config: dict, info: dict):
     cfg = config["equip"]["terse"]
     use_legendary_ranges = config["equip"]["use_legendary_ranges"]
 
-    if use_legendary_ranges:
+    if use_legendary_ranges and not info["is_beta"]:
         percentiles = info["calculations"]["legendary_percentiles"]
     else:
         percentiles = info["calculations"]["percentiles"]
@@ -169,7 +169,7 @@ def _format_expanded_equip_preview(config: dict, info: dict):
     cfg = config["equip"]["expanded"]
     use_legendary_ranges = config["equip"]["use_legendary_ranges"]
 
-    if use_legendary_ranges:
+    if use_legendary_ranges and not info["is_beta"]:
         percentiles = info["calculations"]["legendary_percentiles"]
     else:
         percentiles = info["calculations"]["percentiles"]
@@ -352,9 +352,14 @@ def _get_header(info: dict):
 
     # Dropped by cheekyjtx • Owned by cheekyjtx
     if info["owner"].get("source_name"):
-        status2 = (
-            f"Dropped by {info['owner']['source_name']} on {info['owner']['date']}"
-        )
+        # status2 = f"Generated for [{info['owner']['source_name']}]"
+        # if info["owner"]["source_mob"]:
+        #     status2 += f" by [{info['owner']['source_mob']}]"
+        # status2 += f" on {info['owner']['date']}"
+        status2 = f"{info['owner']['source_name']}"
+        if info["owner"]["source_mob"]:
+            status2 += f" • {info['owner']['source_mob']}"
+        status2 += f" • {info['owner']['date']}"
         lines.append(f"# {status2}")
 
     return "\n".join(lines)

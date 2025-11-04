@@ -12,9 +12,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import PlainTextResponse
 from Levenshtein import distance
 
-from classes.core.server import equip_parser, equip_parser_beta, logger
+from classes.core.server import (
+    equip_parser,
+    equip_parser_beta,
+    infer_equip_stats,
+    infer_equip_stats_beta,
+    logger,
+)
 from classes.core.server.equip_parser import LOGGER, fetch_equip_html
-from classes.core.server.infer_equip_stats import infer_equip_stats
 from classes.core.server.middleware import (
     ErrorLog,
     GZipWrapper,
@@ -457,17 +462,17 @@ async def get_equip(
 
             if not is_isekai:
                 data = equip_parser.parse_equip_html(resp.text)
-                data["calculations"] = infer_equip_stats(data)
+                data["calculations"] = infer_equip_stats.infer_equip_stats(data)
             else:
                 data = equip_parser_beta.parse_equip_html(resp.text)
-                data["calculations"] = dict(
-                    percentiles=dict(),
-                    legendary_percentiles=dict(),
+                data["calculations"] = data["calculations"] = (
+                    infer_equip_stats_beta.infer_equip_stats(data)
                 )
+                LOGGER.info(json.dumps(data, indent=2))
 
             db.execute(
                 """
-                INSERT INTO equips (
+                INSERT OR REPLACE INTO equips (
                     id, key, is_isekai, updated_at, data
                 ) VALUES (
                     ?, ?, ?, ?, ?
