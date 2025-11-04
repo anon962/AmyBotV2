@@ -209,7 +209,7 @@ class EditWatcher(DWatcher):
 
 
 class MoreWatcher(DWatcher):
-    chunk_size: ClassVar[int] = 4
+    chunk_size: ClassVar[int] = 10
 
     def __init__(
         self, channel: int, bot: "core.AmyBot", remaining_pages: list[str]

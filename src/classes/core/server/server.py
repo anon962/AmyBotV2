@@ -402,75 +402,81 @@ def export_json(db: Connection = Depends(init_db)):
     return resp
 
 
+db_lock = asyncio.Lock()
+
+
 @server.get("/equip")
 async def get_equip(
     eid: int,
     key: str,
     is_isekai: bool = False,
 ):
-    db = init_db()
+    async with db_lock:
+        db = init_db()
+        with db:
+            last_fetch = select_metadata(db, "last_hv_fetch")
+            now = datetime.datetime.now()
 
-    last_fetch = select_metadata(db, "last_hv_fetch")
-    now = datetime.datetime.now()
+            if last_fetch:
+                last_fetch = datetime.datetime.fromisoformat(last_fetch)
+                next_fetch = last_fetch + datetime.timedelta(
+                    seconds=HV_FETCH_DELAY_SECONDS
+                )
 
-    if last_fetch:
-        last_fetch = datetime.datetime.fromisoformat(last_fetch)
-        next_fetch = last_fetch + datetime.timedelta(seconds=HV_FETCH_DELAY_SECONDS)
+                if now < next_fetch:
+                    insert_metadata(db, "last_hv_fetch", next_fetch.isoformat())
 
-        if now < next_fetch:
-            insert_metadata(db, "last_hv_fetch", next_fetch.isoformat())
+                    delay = (next_fetch - now).seconds
+                    await asyncio.sleep(delay)
+                else:
+                    insert_metadata(db, "last_hv_fetch", now.isoformat())
+            else:
+                insert_metadata(db, "last_hv_fetch", now.isoformat())
 
-            delay = (next_fetch - now).seconds
-            await asyncio.sleep(delay)
-        else:
-            insert_metadata(db, "last_hv_fetch", now.isoformat())
-    else:
-        insert_metadata(db, "last_hv_fetch", now.isoformat())
+            resp = fetch_equip_html(eid, key, is_isekai)
+            if resp.status_code != 200:
+                raise HTTPException(resp.status_code)
+            elif "No such equip" in resp.text:
+                raise HTTPException(404)
+            elif "Nope" in resp.text:
+                raise HTTPException(400)
 
-    db.commit()
-
-    resp = fetch_equip_html(eid, key, is_isekai)
-    if resp.status_code != 200:
-        raise HTTPException(resp.status_code)
-
-    db.execute(
-        """
-        INSERT INTO equips_html (
-            id, key, created_at, html
-        ) VALUES (
-            ?, ?, ?, ?
-        )
-        """,
-        [eid, key, now.isoformat(), resp.text],
-    )
-    db.commit()
-
-    if resp.text in ["Nope", "No such item"]:
-        raise HTTPException(404)
-
-    if not is_isekai:
-        data = equip_parser.parse_equip_html(resp.text)
-        data["calculations"] = infer_equip_stats(data)
-
-        db.execute(
-            """
-            INSERT OR REPLACE INTO equips (
-                id, key, updated_at, data
-            ) VALUES (
-                ?, ?, ?, ?
+            db.execute(
+                """
+                INSERT INTO equips_html (
+                    id, key, is_isekai, created_at, html
+                ) VALUES (
+                    ?, ?, ? ,?, ?
+                )
+                """,
+                [eid, key, int(is_isekai), now.isoformat(), resp.text],
             )
-            """,
-            [eid, key, now.isoformat(), json.dumps(data)],
-        )
-        db.commit()
-    else:
-        data = equip_parser_beta.parse_equip_html(resp.text)
-        data["calculations"] = dict(
-            percentiles=dict(),
-            legendary_percentiles=dict(),
-        )
 
-    return data
+            if resp.text in ["Nope", "No such item"]:
+                raise HTTPException(404)
+
+            if not is_isekai:
+                data = equip_parser.parse_equip_html(resp.text)
+                data["calculations"] = infer_equip_stats(data)
+            else:
+                data = equip_parser_beta.parse_equip_html(resp.text)
+                data["calculations"] = dict(
+                    percentiles=dict(),
+                    legendary_percentiles=dict(),
+                )
+
+            db.execute(
+                """
+                INSERT INTO equips (
+                    id, key, is_isekai, updated_at, data
+                ) VALUES (
+                    ?, ?, ?, ?, ?
+                )
+                """,
+                [eid, key, int(is_isekai), now.isoformat(), json.dumps(data)],
+            )
+
+            return data
 
 
 @server.get("/spellcheck_equip")

@@ -4,6 +4,7 @@ from typing import cast
 
 import loguru
 from bs4 import BeautifulSoup, Tag
+from soupsieve import select_one
 
 from utils.html import (
     get_children,
@@ -97,19 +98,24 @@ def _parse_equip_category(soup: BeautifulSoup) -> tuple[str, int | str, bool]:
 
 def _parse_status(soup: BeautifulSoup) -> dict:
     status_el = select_one_or_raise(soup, ".eq > div:nth-child(2)")
+    text = status_el.get_text().strip()
 
-    # Condition: 68%     Energy: 35%
-    m = search_or_raise(
-        r"Condition: (\d+)% \s+ Energy: (?:(\d+)%|(N\/A))",
-        status_el.get_text().replace("\xa0", " "),
-    )
-
-    condition = int(m.group(1))
-
-    if m.group(2):
-        energy = int(m.group(2))
-    else:
+    if text == "Salvaged - Repair Required":
+        condition = None
         energy = None
+    else:
+        # Condition: 68%     Energy: 35%
+        m = search_or_raise(
+            r"Condition: (\d+)% \s+ Energy: (?:(\d+)%|(N\/A))",
+            text,
+        )
+
+        condition = int(m.group(1))
+
+        if m.group(2):
+            energy = int(m.group(2))
+        else:
+            energy = None
 
     return dict(
         condition=dict(
@@ -180,11 +186,14 @@ def _parse_misc_stats(soup: BeautifulSoup):
         if not children:
             continue
 
-        m_base = search_or_raise(
-            r"Base: (\d+(?:\.\d+)?)",
-            cast(str, el["title"]),
-        )
-        base_value = float(m_base.group(1))
+        if getattr(el, "title"):
+            m_base = search_or_raise(
+                r"Base: (\d+(?:\.\d+)?)",
+                cast(str, el["title"]),
+            )
+            base_value = float(m_base.group(1))
+        else:
+            base_value = 0
 
         name = get_stripped_text(children[0])
         value = float(get_stripped_text(children[1]).strip("+"))
@@ -226,11 +235,14 @@ def _parse_single_cat_stat(el: Tag):
     children = get_children(el)
     assert len(children) == 2, children
 
-    m_base = search_or_raise(
-        r"Base: (\d+(?:\.\d+)?)",
-        cast(str, el["title"]),
-    )
-    base_value = float(m_base.group(1))
+    if getattr(el, "title"):
+        m_base = search_or_raise(
+            r"Base: (\d+(?:\.\d+)?)",
+            cast(str, el["title"]),
+        )
+        base_value = float(m_base.group(1))
+    else:
+        base_value = 0
 
     name = get_self_text(children[0])
     value = float(get_stripped_text(children[1]).strip("+"))
@@ -291,8 +303,9 @@ def _parse_owner(soup: BeautifulSoup):
             source_el["href"],  # type: ignore
         ).group(1)
     )
+    source_date = children[0].getText().split()[-1]
 
-    owner_el = select_one_or_raise(children[1], "a")
+    owner_el = select_one("a", children[1])
     if owner_el:
         owner_name = get_stripped_text(owner_el)
         owner_uid = int(
@@ -308,6 +321,7 @@ def _parse_owner(soup: BeautifulSoup):
     return dict(
         name=owner_name,
         uid=owner_uid,
+        date=source_date,
         source_name=source_name,
         source_uid=source_uid,
     )

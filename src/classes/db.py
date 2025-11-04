@@ -9,6 +9,8 @@ Db: TypeAlias = sqlite3.Connection
 def init_db() -> Db:
     db = sqlite3.connect(paths.DB_FILE)
 
+    # db.execute("PRAGMA journal_mode=WAL")
+
     db.row_factory = sqlite3.Row
 
     # Super

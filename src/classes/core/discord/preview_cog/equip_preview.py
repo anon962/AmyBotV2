@@ -340,19 +340,22 @@ def _get_header(info: dict):
     if bonuses:
         lines.append("# " + " • ".join(bonuses))
 
-    # # Level 196 • Tradeable • Owned by Pickled_Cow
+    # Level 196 • Tradeable
     if info["level"] == "Soulbound":
         status = "Soulbound"
     elif info["is_tradeable"]:
         status = f'Level {info["level"]} • Tradeable'
     else:
         status = f'Level {info["level"]} • Untradeable'
-    status = status + " • " + f"Owned by {info['owner']['name']}"
-
-    if info["owner"]["source_name"]:
-        status += " • " + f"Dropped by {info['owner']['source_name']}"
-
+    status += f" • Owned by {info['owner']['name']}"
     lines.append(f"# {status}")
+
+    # Dropped by cheekyjtx • Owned by cheekyjtx
+    if info["owner"].get("source_name"):
+        status2 = (
+            f"Dropped by {info['owner']['source_name']} on {info['owner']['date']}"
+        )
+        lines.append(f"# {status2}")
 
     return "\n".join(lines)
 
