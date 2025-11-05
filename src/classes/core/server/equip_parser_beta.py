@@ -111,14 +111,14 @@ def _parse_status(soup: BeautifulSoup) -> dict:
     else:
         # Condition: 68%     Energy: 35%
         m = search_or_raise(
-            r"Condition: (\d+)% \s+ Energy: (?:(\d+)%|(N\/A))",
+            r"Condition: (\d+(?:\.\d+)?)% \s+ Energy: (?:(\d+(?:\.\d+)?)%|(N\/A))",
             text,
         )
 
-        condition = int(m.group(1))
+        condition = float(m.group(1))
 
         if m.group(2):
-            energy = int(m.group(2))
+            energy = float(m.group(2))
         else:
             energy = None
 

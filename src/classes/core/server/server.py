@@ -444,7 +444,7 @@ async def get_equip(
             elif "No such equip" in resp.text:
                 raise HTTPException(404)
             elif "Nope" in resp.text:
-                raise HTTPException(400)
+                raise HTTPException(404)
 
             db.execute(
                 """

@@ -322,7 +322,10 @@ def _parse_enchants(soup: BeautifulSoup):
 
 def _parse_owner(soup: BeautifulSoup):
     owner_el = select_one_or_raise(soup, "#showequip > div:last-child")
-    assert get_self_text(owner_el).strip() == "Current Owner:"
+    if get_self_text(owner_el) == "Current Owner: System":
+        return dict(name="System", uid=0)
+    else:
+        assert get_self_text(owner_el).strip() == "Current Owner:"
 
     href_el = select_one_or_raise(owner_el, "a")
     href: str = href_el["href"]  # type: ignore

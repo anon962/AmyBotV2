@@ -1,104 +1,253 @@
 import asyncio
-import itertools
 import json
-import sqlite3
-from math import prod
-from typing import Literal, TypeAlias
+import random
+import warnings
+from abc import ABC
+from dataclasses import dataclass
+from typing import TypeAlias
 
+import numpy
+import scipy
+import scipy.optimize
 import torch
-from attr import dataclass
-from more_itertools import numeric_range
-from tqdm import tqdm
 
 from classes.core.server.parse_equip_name import parse_equip_name
 from classes.db import init_db
 from config.paths import DATA_DIR
-from utils.misc import take_batches
+
+WORLD = "isekai"
+# WORLD = "persistent"
+
+FIT_TYPE = "curved"
+# FIT_TYPE = "plane"
+# FIT_TYPE = "wiki"
+# FIT_TYPE = "wiki2"
 
 
 async def main():
     edb = init_db()
-    pdb = init_progress_db()
 
     counts = tally(edb)
 
     tmp_dir = DATA_DIR / "tmp"
     tmp_dir.mkdir(exist_ok=True)
 
+    for fp in tmp_dir.glob("*"):
+        fp.unlink()
+
     items = list(counts.items())
     items.sort(key=lambda kv: len(kv[1]), reverse=True)
 
+    min_result_count = 15 if WORLD == "isekai" else 60
+
     # plots
-    for gid, group in items[:10]:
+    for gid, group in items:
+        if len(group) < min_result_count:
+            continue
+
+        suffix_filters = []
+        match gid[0]:
+            case "Physical Mitigation":
+                suffix_filters = ["Protection"]
+            case "Magical Mitigation":
+                suffix_filters = ["Warding"]
+            case "Block":
+                suffix_filters = ["Shielding", "Barrier"]
+            case "Parry":
+                suffix_filters = ["Nimble"]
+            case "Attack Crit Damage":
+                suffix_filters = ["Balance"]
+            case "Attack Accuracy":
+                suffix_filters = ["Balance"]
+            case "Magic Damage":
+                suffix_filters = ["Radiant", "Destruction"]
+            case "Magic Accuracy":
+                suffix_filters = ["Focus"]
+            case "Evade Chance":
+                suffix_filters = ["Fleet"]
+            case "Intelligence":
+                suffix_filters = ["Owl"]
+            case "Burden":
+                suffix_filters = ["Mithril"]
+            case "Wisdom":
+                suffix_filters = []
+            case "Agility":
+                suffix_filters = []
+            case "Interference":
+                suffix_filters = ["Mithril"]
+            case "Crushing":
+                suffix_filters = ["Dampening", "Reinforced"]
+            case "Piercing":
+                suffix_filters = ["Deflection", "Reinforced"]
+            case "Slashing":
+                suffix_filters = ["Stoneskin", "Reinforced"]
+            case _:
+                print(f"No known filter for:", gid[0])
+                continue
+
+        group = [
+            x
+            for x in group
+            if all(x["name_parts"]["suffix"] != y for y in suffix_filters)
+        ]
+        if len(group) < min_result_count:
+            continue
+
         name = "_".join(str(x) for x in gid)
         print(len(group), name)
-        plot(name, group)
 
-    # approx
-    # base = [v["base"] for v in items[0][1]]
-    # level = [v["d"]["level"] for v in items[0][1]]
-    # value = [v["value"] for v in items[0][1]]
-    # print(base)
-    # print(level)
-    # print(value)
+        best: tuple = None  # type: ignore
+        for _ in range(100):
+            pts = [(x["base"], x["d"]["level"], x["value"]) for x in group]
 
-    # for c in iter_candidates(pdb):
-    #     sols = await eval_candidate(c, base, level, value)
+            try:
+                if FIT_TYPE == "curved":
+                    fit = CurvedPlaneFit.from_points(pts)
+                elif FIT_TYPE == "wiki":
+                    fit = WikiFit.from_points(*random.sample(pts, 5))
+                elif FIT_TYPE == "wiki2":
+                    fit = WikiFit2.from_points(*random.sample(pts, 5))
+                else:
+                    fit = PlaneFit.from_points(*random.sample(pts, 3))
+            except Exception:
+                print("\tFailed to fit")
+                break
 
-    #     for s in sols:
-    #         pdb.execute(
-    #             """
-    #             INSERT INTO solutions (
-    #                 id, params, error
-    #             ) VALUES (
-    #                 ?, ?, ?
-    #             )
-    #             """,
-    #             [
-    #                 json.dumps(c.to_id()),
-    #                 json.dumps(s["params"]),
-    #                 s["error"],
-    #             ],
-    #         )
+            loss = fit.calc_loss(pts)
 
-    #     pdb.commit()
+            if not best or loss < best[0]:
+                best = (loss, fit)
+
+        if not best:
+            continue
+
+        loss, fit = best
+        print("\tloss:", pp(loss))
+        print("\tplane:", str(fit))
+
+        plot(name, group, fit, loss)
 
 
-def plot(name: str, group: list[dict]):
+def plot(name: str, group: list[dict], fit: "Fit", loss: float):
     import pandas
     import plotly.express as px
+    import plotly.graph_objects as go
 
-    data = [
-        dict(
+    lines = []
+    lines.append(f"{fit.__class__} {loss} | {repr(fit)}")
+
+    equip_url = "https://hentaiverse.org/"
+    if WORLD == "isekai":
+        equip_url += "isekai/"
+    equip_url += "equip/"
+
+    data = []
+    annotations = []
+    for v in group:
+        pred = fit.eval(v["base"], v["d"]["level"])
+        loss = (v["value"] - pred) ** 2
+
+        d = dict(
             base=v["base"],
             level=v["d"]["level"],
             value=v["value"],
             name=v["d"]["name"],
             suffix=v["name_parts"]["suffix"],
-            href=f"https://hentaiverse.org/isekai/equip/{v['d']['id']}/{v['d']['key']}",
+            pred=pred,
+            loss=loss,
         )
-        for v in group
-    ]
+        data.append(d)
+
+        if loss > 4:
+            annotations.append(
+                dict(
+                    x=v["base"],
+                    y=v["d"]["level"],
+                    z=v["value"],
+                    text=f"""<a href="{equip_url}{v['d']['id']}/{v['d']['key']}">link</a>""",
+                    showarrow=False,
+                )
+            )
+
+        lines.append(
+            ",".join(
+                str(x)
+                for x in [
+                    v["base"],
+                    v["d"]["level"],
+                    v["value"],
+                    v["name_parts"]["tier"],
+                    f"{equip_url}{v['d']['id']}/{v['d']['key']}",
+                ]
+            )
+        )
+
     df = pandas.DataFrame(data)
     fig = px.scatter_3d(
         df,
         x="base",
         y="level",
         z="value",
-        color="suffix",
+        color="loss",
         hover_data=list(data[0].keys()),
     )
+
+    fig.update_layout(
+        scene=dict(
+            annotations=annotations,
+        ),
+    )
+
+    min_base = min(v["base"] for v in group)
+    max_base = max(v["base"] for v in group)
+    x = numpy.arange(min_base * 0.9, max_base * 1.1, (max_base - min_base) / 100)
+
+    min_level = min(v["d"]["level"] for v in group)
+    max_level = max(v["d"]["level"] for v in group)
+    y = numpy.arange(min_level * 0.9, max_level * 1.1, (max_level - min_level) / 100)
+
+    X, Y = numpy.meshgrid(x, y)
+    Z = fit.eval(X, Y)
+
+    surface = go.Surface(
+        x=X,
+        y=Y,
+        z=Z,
+        showscale=False,
+        opacity=0.3,
+        showlegend=False,
+        hoverinfo="skip",
+        hovertemplate=None,
+    )
+    surface.contours.x.highlight = False  # type: ignore
+    surface.contours.y.highlight = False  # type: ignore
+    surface.contours.z.highlight = False  # type: ignore
+    fig.add_trace(surface)
+
     fig.write_html(DATA_DIR / "tmp" / f"{name}.html")
+
+    (DATA_DIR / "tmp" / f"{name}.data").write_text("\n".join(lines))
 
 
 def tally(edb):
-    rs = edb.execute(
-        """
-        SELECT id, key, data
-        FROM equips
-        WHERE json_extract(data, '$.owner.source_name') IS NOT NULL
-        """
-    )
+    if WORLD == "isekai":
+        rs = edb.execute(
+            """
+            SELECT id, key, data
+            FROM equips
+            WHERE is_isekai = 1
+            """
+        )
+    else:
+        rs = edb.execute(
+            """
+            SELECT id, key, data
+            FROM equips
+            WHERE is_isekai = 0
+            AND json_extract(data, '$.upgrades') == '{}'
+            AND json_extract(data, '$.enchants') == '{}'
+            """
+        )
 
     data = []
     for r in rs:
@@ -127,7 +276,11 @@ def tally(edb):
                 if stat["base"] == 0:
                     continue
 
-                name_parts = parse_equip_name(d["name"])
+                try:
+                    name_parts = parse_equip_name(d["name"])
+                except Exception:
+                    print("Bad name", d["name"])
+                    continue
 
                 key = (
                     stat_name,
@@ -173,376 +326,261 @@ def tally(edb):
     return counts
 
 
-def init_progress_db():
-    db_file = DATA_DIR / "tmp" / "progress.sqlite"
-    db_file.parent.mkdir(exist_ok=True)
-    db = sqlite3.connect(db_file)
-    db.row_factory = sqlite3.Row
-    db.execute(
-        """
-        CREATE TABLE IF NOT EXISTS progress (
-            id      TEXT        PRIMARY KEY
-        )
-        """
-    )
-    db.execute(
-        """
-        CREATE TABLE IF NOT EXISTS solutions (
-            id          TEXT        NOT NULL,
-            params      TEXT        NOT NULL,
-            error       REAL        NOT NULL,
-            PRIMARY KEY (id, params)
-        )
-        """
-    )
-    return db
-
-
-NUM_OPS = 2
-
-MultOp: TypeAlias = Literal["mult"]  # cx
-InvOp: TypeAlias = Literal["inv"]  # 1 / x
-AddOp: TypeAlias = Literal["add"]  # x + c
-ExpOp: TypeAlias = Literal["exp"]  # x^c
-Exp2Op: TypeAlias = Literal["exp2"]  # c^x
-LogOp: TypeAlias = Literal["log"]  # log(x)
-Op: TypeAlias = MultOp | AddOp | ExpOp | Exp2Op | LogOp
-OpBatch: TypeAlias = tuple[Op, Op, Op]
+Point2: TypeAlias = tuple[float, float]
+Point3: TypeAlias = tuple[float, float, float]
 
 
 @dataclass
-class Candidate:
-    base_ops: OpBatch
-    level_ops: OpBatch
-    merge_op: AddOp | MultOp | ExpOp | Exp2Op
-    merged_ops: OpBatch
+class Fit(ABC):
+    def eval(self, x, y): ...
 
-    def __post_init__(self):
-        for batch in [self.base_ops, self.level_ops, self.merged_ops]:
-            seen = set()
-            prev_was_none = False
-            for op in batch:
-                if op is None:
-                    prev_was_none = True
-                    continue
-                elif prev_was_none:
-                    raise Exception(f"Non-null value follows null value: {batch}")
+    def eval_all(self, xys: list[Point2]) -> list[float]: ...
 
-                if op in seen:
-                    raise Exception(f"Duplicate op: {op} {batch}")
-                seen.add(op)
+    def calc_loss(self, xyzs: list[Point3]) -> float: ...
 
-    def to_id(self) -> tuple:
-        id = tuple([*self.base_ops, *self.level_ops, self.merge_op, *self.merged_ops])
-        return id
+
+@dataclass
+class PlaneFit(Fit):
+    a: float
+    b: float
+    c: float
+    k: float
 
     @classmethod
-    def from_id(cls, id) -> "Candidate":
-        return cls(
-            base_ops=id[0 * NUM_OPS : 1 * NUM_OPS],
-            level_ops=id[1 * NUM_OPS : 2 * NUM_OPS],
-            merge_op=id[2 * NUM_OPS],
-            merged_ops=id[2 * NUM_OPS + 1, 3 * NUM_OPS + 1],
+    def from_points(cls, p0: Point3, p1: Point3, p2: Point3) -> "PlaneFit":
+        u = (p1[0] - p0[0], p1[1] - p0[1], p1[2] - p0[2])
+        v = (p2[0] - p0[0], p2[1] - p0[1], p2[2] - p0[2])
+
+        cross = (
+            u[1] * v[2] - u[2] * v[1],
+            u[2] * v[0] - u[0] * v[2],
+            u[0] * v[1] - u[1] * v[0],
         )
 
-    def __hash__(self) -> int:
-        return hash(self.to_id())
+        k = -1 * (cross[0] * p0[0] + cross[1] * p0[1] + cross[2] * p0[2])
 
-    def __eq__(self, value: object) -> bool:
-        return isinstance(value, Candidate) and hash(self) == hash(value)
+        return cls(
+            a=cross[0],
+            b=cross[1],
+            c=cross[2],
+            k=k,
+        )
+
+    def eval(self, x, y):
+        return (self.a * x + self.b * y + self.k) / (-self.c + 1e-9)
+
+    def eval_all(self, xys: list[Point2]) -> list[float]:
+        xs = torch.tensor([u[0] for u in xys])
+        ys = torch.tensor([u[1] for u in xys])
+        zs = (self.a * xs + self.b * ys + self.k) / (-self.c + 1e-9)
+        return zs.tolist()
+
+    def calc_loss(self, xyzs: list[tuple[float, float, float]]) -> float:
+        zs = torch.tensor([u[2] for u in xyzs])
+        preds = torch.tensor(self.eval_all([(u[0], u[1]) for u in xyzs]))
+
+        loss = (preds - zs) ** 2
+        loss = loss.mean().item()
+        return loss
 
     def __str__(self) -> str:
-        return "|".join(
+        return " ".join(
             [
-                "-".join(self.base_ops),
-                "-".join(self.level_ops),
-                self.merge_op,
-                "-".join(self.merged_ops),
+                pp(self.a / (-self.c + 1e-9)),
+                pp(self.b / (-self.c + 1e-9)),
+                pp(self.k / (-self.c + 1e-9)),
+            ]
+        )
+
+    def __repr__(self) -> str:
+        return " ".join(
+            [
+                str(self.a / (-self.c + 1e-9)),
+                str(self.b / (-self.c + 1e-9)),
+                str(self.k / (-self.c + 1e-9)),
             ]
         )
 
 
-ALL_OPS = [
-    "mult",
-    # "inv",
-    "add",
-    # "exp",
-    # "exp2",
-    # "log",
-]
-MERGE_OPS = [
-    "add",
-    "mult",
-    # "exp",
-    # "exp2",
-]
+@dataclass
+class CurvedPlaneFit(Fit):
+    """
+    z = k * (x+a) * (y+b) + c
 
+    wiki claims
+    z = x * (1 + y/k)
+    z = (1/k) * (x) * (y + k)
+    """
 
-def iter_candidates(db):
-    is_done = lambda id: bool(
-        db.execute("SELECT 1 FROM progress WHERE id = ?", [id]).fetchone()
-    )
-    insert = lambda id: bool(
-        db.execute("INSERT INTO progress (id) VALUES (?)", [id]).fetchone()
-    )
+    a: float
+    b: float
+    c: float
+    k: float
 
-    pbar = tqdm()
-    idx = 0
-    for base_ops in itertools.permutations(ALL_OPS, NUM_OPS):
-        for level_ops in itertools.permutations(ALL_OPS, NUM_OPS):
-            for merged_ops in itertools.permutations(ALL_OPS, NUM_OPS):
-                for merge_op in MERGE_OPS:
-                    idx += 1
-                    pbar.update()
+    @classmethod
+    def from_points(
+        cls,
+        pts: list[Point3],
+    ) -> "CurvedPlaneFit":
+        def eval(pts, a, b, c, k):
+            # 0 = k(x+a)(y+b) + c - z
+            return k * (pts[:, 0] + a) * (pts[:, 1] + b) + c
 
-                    candidate = Candidate(
-                        base_ops=base_ops,  # type: ignore
-                        level_ops=level_ops,  # type: ignore
-                        merge_op=merge_op,  # type: ignore
-                        merged_ops=merged_ops,  # type: ignore
-                    )
-                    if is_done(json.dumps(candidate.to_id())):
-                        continue
+        warnings.filterwarnings("ignore", "The iteration is not making good progress")
 
-                    yield candidate
-
-                    insert(json.dumps(candidate.to_id()))
-                    db.commit()
-
-
-OP_RANGES = dict(
-    mult=(
-        list(
-            itertools.chain(
-                numeric_range(0, 5, 0.1),
-                # numeric_range(1, 50, 5),
-                # numeric_range(50, 200, 10),
-                numeric_range(-5, 0, 0.5),
-            )
+        arr = numpy.array(pts, dtype=numpy.float64)
+        result: tuple = scipy.optimize.curve_fit(
+            eval,
+            arr[:, :2],
+            arr[:, 2],
+            (100, 100, 100, 100),
         )
-    ),
-    inv=([-99]),
-    add=(
-        list(
-            itertools.chain(
-                numeric_range(0, 5, 0.1),
-                # numeric_range(5, 50, 5),
-                numeric_range(-5, 0, 0.5),
-                # numeric_range(-100, -5, 5),
-            )
-        )
-    ),
-    exp=(
-        list(
-            itertools.chain(
-                numeric_range(0, 5, 0.1),
-                # numeric_range(5, 10, 0.5),
-            )
-        )
-    ),
-    exp2=(
-        list(
-            itertools.chain(
-                numeric_range(0, 5, 0.1),
-                # numeric_range(5, 100, 5),
-            )
-        )
-    ),
-    log=([-99]),
-)
+
+        a, b, c, k = result[0]
+
+        return cls(a, b, c, k)
+
+    def eval(self, x, y):
+        return self.k * (x + self.a) * (y + self.b) + self.c
+
+    def eval_all(self, xys: list[Point2]) -> list[float]:
+        xs = torch.tensor([u[0] for u in xys])
+        ys = torch.tensor([u[1] for u in xys])
+        zs = self.eval(xs, ys).tolist()
+        return zs
+
+    def calc_loss(self, xyzs: list[tuple[float, float, float]]) -> float:
+        zs = torch.tensor([u[2] for u in xyzs])
+        preds = torch.tensor(self.eval_all([(u[0], u[1]) for u in xyzs]))
+
+        loss = (preds - zs) ** 2
+        loss = loss.mean().item()
+        return loss
+
+    def __str__(self) -> str:
+        return " ".join([pp(self.a), pp(self.b), pp(self.c), pp(self.k)])
+
+    def __repr__(self) -> str:
+        return " ".join([str(self.a), str(self.b), str(self.c), str(self.k)])
 
 
-async def eval_candidate(
-    c: Candidate,
-    base_raw: list[float],
-    level_raw: list[float],
-    values_raw: list[float],
-    batch_size=100_000,
-    thresh=0.1,
-):
-    assert len(base_raw) == len(level_raw) == len(values_raw)
-    n = len(base_raw)
+@dataclass
+class WikiFit(Fit):
+    """
+    z = x * (1 + y/k)
+    z = (1/k) * (x) * (y + k)
+    """
 
-    base_src = torch.tensor(base_raw, dtype=torch.float).to("cuda")  # n
-    level_src = torch.tensor(level_raw, dtype=torch.float).to("cuda")  # n
-    values = torch.tensor(values_raw, dtype=torch.float).to("cuda")  # n
+    k: float
 
-    o = NUM_OPS * 3  # number of constants
-
-    print(c)
-    sols = []
-
-    prod_iter = take_batches(
-        itertools.product(
-            *[
-                OP_RANGES[op]
-                for op in [
-                    *c.base_ops,
-                    *c.level_ops,
-                    *c.merged_ops,
-                ]
+    @classmethod
+    def from_points(cls, p0: Point3, p1, p2, p3, p4) -> "WikiFit":
+        def system_of_equations(u):
+            return [
+                p0[0] * (1 + p0[1] / u[0]) - p0[2],
+                # p1[0] * (1 + p1[1] / u[0]) - p1[2],
+                # p2[0] * (1 + p2[1] / u[0]) - p2[2],
+                # p3[0] * (1 + p3[1] / u[0]) - p3[2],
+                # p4[0] * (1 + p4[1] / u[0]) - p4[2],
             ]
-        ),
-        batch_size,
-    )
 
-    total = prod(
-        [
-            len(OP_RANGES[op])
-            for op in [
-                *c.base_ops,
-                *c.level_ops,
-                *c.merged_ops,
+        warnings.filterwarnings("ignore", "The iteration is not making good progress")
+        result: tuple = scipy.optimize.fsolve(system_of_equations, [35])
+
+        k = result[0]
+
+        return cls(k)
+
+    def eval(self, x, y):
+        return x * (1 + y / self.k)
+
+    def eval_all(self, xys: list[Point2]) -> list[float]:
+        xs = torch.tensor([u[0] for u in xys])
+        ys = torch.tensor([u[1] for u in xys])
+        zs = xs * (1 + ys / self.k)
+        return zs.tolist()
+
+    def calc_loss(self, xyzs: list[tuple[float, float, float]]) -> float:
+        zs = torch.tensor([u[2] for u in xyzs])
+        preds = torch.tensor(self.eval_all([(u[0], u[1]) for u in xyzs]))
+
+        loss = (preds - zs) ** 2
+        loss = loss.mean().item()
+        return loss
+
+    def __str__(self) -> str:
+        return " ".join([pp(self.k)])
+
+    def __repr__(self) -> str:
+        return " ".join([str(self.k)])
+
+
+@dataclass
+class WikiFit2(Fit):
+    """
+    z = x * (1 + y/k)
+    z = (1/k) * (x) * (y + k)
+    """
+
+    k1: float
+    k2: float
+
+    @classmethod
+    def from_points(cls, p0: Point3, p1, p2, p3, p4) -> "WikiFit2":
+        def system_of_equations(u):
+            return [
+                p0[0] / u[1] * (1 + p0[1] / u[0]) - p0[2],
+                p1[0] / u[1] * (1 + p1[1] / u[0]) - p1[2],
+                # p2[0] * (1 + p2[1] / u[0]) - p2[2],
+                # p3[0] * (1 + p3[1] / u[0]) - p3[2],
+                # p4[0] * (1 + p4[1] / u[0]) - p4[2],
             ]
-        ]
-    )
-    pbar = tqdm(total=total // 1000)
 
-    best: dict = dict()
+        warnings.filterwarnings("ignore", "The iteration is not making good progress")
+        result: tuple = scipy.optimize.fsolve(system_of_equations, [1, 1])
 
-    while True:
-        params = next(prod_iter, [])
-        b = len(params)
-        if b == 0:
-            break
+        k1, k2 = result
 
-        params = (
-            torch.tensor(params, dtype=torch.float)
-            .to("cuda")
-            .unsqueeze(0)
-            .expand(n, b, o)
-        )  # [n b o]
+        return cls(k1, k2)
 
-        param_idx = 0
+    def eval(self, x, y):
+        return x / self.k2 * (1 + y / self.k1)
 
-        # base
-        x = base_src.unsqueeze(1).repeat(1, b)  # n b
-        for op in c.base_ops:
-            match op:
-                case "add":
-                    x = x + params[:, :, param_idx]
-                case "mult":
-                    x = x * params[:, :, param_idx]
-                case "inv":
-                    x = 1 / x
-                case "exp":
-                    x = x ** params[:, :, param_idx]
-                case "exp2":
-                    x = params[:, :, param_idx] ** x
-                case "log":
-                    x = torch.log(x)
-                case _:
-                    raise Exception()
-            param_idx += 1
-        base = x
+    def eval_all(self, xys: list[Point2]) -> list[float]:
+        xs = torch.tensor([u[0] for u in xys])
+        ys = torch.tensor([u[1] for u in xys])
+        zs = xs / self.k2 * (1 + ys / self.k1)
+        return zs.tolist()
 
-        # level
-        x = level_src.unsqueeze(1).repeat(1, b)  # n b
-        for op in c.level_ops:
-            match op:
-                case "add":
-                    x = x + params[:, :, param_idx]
-                case "mult":
-                    x = x * params[:, :, param_idx]
-                case "inv":
-                    x = 1 / x
-                case "exp":
-                    x = x ** params[:, :, param_idx]
-                case "exp2":
-                    x = params[:, :, param_idx] ** x
-                case "log":
-                    x = torch.log(x)
-                case _:
-                    raise Exception()
-            param_idx += 1
-        level = x
+    def calc_loss(self, xyzs: list[tuple[float, float, float]]) -> float:
+        zs = torch.tensor([u[2] for u in xyzs])
+        preds = torch.tensor(self.eval_all([(u[0], u[1]) for u in xyzs]))
 
-        # merge
-        match c.merge_op:
-            case "add":
-                x = base + level
-            case "mult":
-                x = base * level
-            case "exp":
-                x = base**level
-            case "exp2":
-                x = level**base
-            case _:
-                raise Exception()
+        loss = (preds - zs) ** 2
+        loss = loss.mean().item()
+        return loss
 
-        # post-merge
-        for op in c.merged_ops:
-            match op:
-                case "add":
-                    x = x + params[:, :, param_idx]
-                case "mult":
-                    x = x * params[:, :, param_idx]
-                case "inv":
-                    x = 1 / (x + 1e-8)
-                case "exp":
-                    x = x ** params[:, :, param_idx]
-                case "exp2":
-                    x = params[:, :, param_idx] ** x
-                case "log":
-                    x = torch.log(x)
-                case _:
-                    raise Exception()
-            param_idx += 1
-
-        # error
-        error = values.unsqueeze(1).expand(n, b)
-        error = (error - x) ** 2
-        error = error.mean(dim=0)
-
-        mn_idx: int = torch.argmin(error).item()  # type: ignore
-
-        await asyncio.get_running_loop().run_in_executor(
-            None,
-            torch.cuda.synchronize,
-        )
-        if not best or error[mn_idx].item() < best["error"]:
-            best = dict(
-                error=error[mn_idx].item(),
-                params=params[0, mn_idx, :].tolist(),
-            )
-
-        for idx in range(b):
-            if error[idx] < thresh:
-                print(
-                    "\t",
-                    pp(x[0, idx].item()),
-                    pp(error[idx].item()),
-                    pp(base[0, idx].item()),
-                    pp(level[0, idx].item()),
-                    "|",
-                    pp(params[0, idx, :].tolist()),
-                )
-
-                sols.append(
-                    dict(
-                        error=error[idx].item(),
-                        params=params[0, idx, :].tolist(),
-                    )
-                )
-
-        pbar.update(b // 1000)
-        pbar.set_description(
-            " ".join(
-                [
-                    pp(best["error"]),
-                    "|",
-                    pp(best["params"]),
-                ]
-            )
+    def __str__(self) -> str:
+        return " ".join(
+            [
+                pp(self.k1),
+                pp(self.k2),
+            ]
         )
 
-    return sols
+    def __repr__(self) -> str:
+        return " ".join(
+            [
+                str(self.k1),
+                str(self.k2),
+            ]
+        )
 
 
-def pp(x: float | list[float]):
+def pp(x: float | list[float] | tuple[float, ...]):
     if isinstance(x, float):
         return f"{x:.3f}"
-    elif isinstance(x, list):
+    elif isinstance(x, (list, tuple)):
         return ", ".join(pp(y) for y in x)
     else:
         raise Exception()
