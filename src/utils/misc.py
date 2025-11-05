@@ -88,3 +88,17 @@ def get_tally(xs: Iterable, fn):
         counts[k].append(v)
 
     return counts
+
+
+def take_batches(it, n: int):
+    batch = []
+    try:
+        while True:
+            for idx in range(n):
+                batch.append(next(it))
+
+            yield batch
+            batch = []
+    except StopIteration:
+        if batch:
+            yield batch

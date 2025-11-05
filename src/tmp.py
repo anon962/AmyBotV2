@@ -1,3 +1,4 @@
+import asyncio
 import itertools
 import json
 import sqlite3
@@ -12,74 +13,86 @@ from tqdm import tqdm
 from classes.core.server.parse_equip_name import parse_equip_name
 from classes.db import init_db
 from config.paths import DATA_DIR
+from utils.misc import take_batches
 
-db = init_db()
 
+async def main():
+    edb = init_db()
+    pdb = init_progress_db()
 
-def main():
-    counts = tally()
+    counts = tally(edb)
 
     tmp_dir = DATA_DIR / "tmp"
     tmp_dir.mkdir(exist_ok=True)
 
-    items = counts.items()
-    gid, group = max(items, key=lambda kv: len(kv[1]))
-    print(gid, len(group))
+    items = list(counts.items())
+    items.sort(key=lambda kv: len(kv[1]), reverse=True)
 
-    base = [v["base"] for v in group]
-    level = [v["d"]["level"] for v in group]
-    value = [v["value"] for v in group]
+    # plots
+    for gid, group in items[:10]:
+        name = "_".join(str(x) for x in gid)
+        print(len(group), name)
+        plot(name, group)
 
-    db_file = DATA_DIR / "tmp" / "progress.sqlite"
-    db_file.parent.mkdir(exist_ok=True)
-    db = sqlite3.connect(db_file)
-    db.row_factory = sqlite3.Row
-    db.execute(
-        """
-        CREATE TABLE IF NOT EXISTS progress (
-            id      TEXT        PRIMARY KEY
+    # approx
+    # base = [v["base"] for v in items[0][1]]
+    # level = [v["d"]["level"] for v in items[0][1]]
+    # value = [v["value"] for v in items[0][1]]
+    # print(base)
+    # print(level)
+    # print(value)
+
+    # for c in iter_candidates(pdb):
+    #     sols = await eval_candidate(c, base, level, value)
+
+    #     for s in sols:
+    #         pdb.execute(
+    #             """
+    #             INSERT INTO solutions (
+    #                 id, params, error
+    #             ) VALUES (
+    #                 ?, ?, ?
+    #             )
+    #             """,
+    #             [
+    #                 json.dumps(c.to_id()),
+    #                 json.dumps(s["params"]),
+    #                 s["error"],
+    #             ],
+    #         )
+
+    #     pdb.commit()
+
+
+def plot(name: str, group: list[dict]):
+    import pandas
+    import plotly.express as px
+
+    data = [
+        dict(
+            base=v["base"],
+            level=v["d"]["level"],
+            value=v["value"],
+            name=v["d"]["name"],
+            suffix=v["name_parts"]["suffix"],
+            href=f"https://hentaiverse.org/isekai/equip/{v['d']['id']}/{v['d']['key']}",
         )
-        """
+        for v in group
+    ]
+    df = pandas.DataFrame(data)
+    fig = px.scatter_3d(
+        df,
+        x="base",
+        y="level",
+        z="value",
+        color="suffix",
+        hover_data=list(data[0].keys()),
     )
-    db.execute(
-        """
-        CREATE TABLE IF NOT EXISTS solutions (
-            id          TEXT        NOT NULL,
-            params      TEXT        NOT NULL,
-            error       REAL        NOT NULL,
-            PRIMARY KEY (id, params)
-        )
-        """
-    )
-
-    print(base)
-    print(level)
-    print(value)
-
-    for c in iter_candidates(db):
-        sols = eval_candidate(c, base, level, value)
-
-        for s in sols:
-            db.execute(
-                """
-                INSERT INTO solutions (
-                    id, params, error
-                ) VALUES (
-                    ?, ?, ?
-                )
-                """,
-                [
-                    json.dumps(c.to_id()),
-                    json.dumps(s["params"]),
-                    s["error"],
-                ],
-            )
-
-        db.commit()
+    fig.write_html(DATA_DIR / "tmp" / f"{name}.html")
 
 
-def tally():
-    rs = db.execute(
+def tally(edb):
+    rs = edb.execute(
         """
         SELECT id, key, data
         FROM equips
@@ -160,7 +173,32 @@ def tally():
     return counts
 
 
-NUM_OPS = 3
+def init_progress_db():
+    db_file = DATA_DIR / "tmp" / "progress.sqlite"
+    db_file.parent.mkdir(exist_ok=True)
+    db = sqlite3.connect(db_file)
+    db.row_factory = sqlite3.Row
+    db.execute(
+        """
+        CREATE TABLE IF NOT EXISTS progress (
+            id      TEXT        PRIMARY KEY
+        )
+        """
+    )
+    db.execute(
+        """
+        CREATE TABLE IF NOT EXISTS solutions (
+            id          TEXT        NOT NULL,
+            params      TEXT        NOT NULL,
+            error       REAL        NOT NULL,
+            PRIMARY KEY (id, params)
+        )
+        """
+    )
+    return db
+
+
+NUM_OPS = 2
 
 MultOp: TypeAlias = Literal["mult"]  # cx
 InvOp: TypeAlias = Literal["inv"]  # 1 / x
@@ -228,11 +266,16 @@ ALL_OPS = [
     "mult",
     # "inv",
     "add",
-    "exp",
-    "exp2",
-    "log",
+    # "exp",
+    # "exp2",
+    # "log",
 ]
-MERGE_OPS = ["add", "mult", "exp", "exp2"]
+MERGE_OPS = [
+    "add",
+    "mult",
+    # "exp",
+    # "exp2",
+]
 
 
 def iter_candidates(db):
@@ -247,8 +290,8 @@ def iter_candidates(db):
     idx = 0
     for base_ops in itertools.permutations(ALL_OPS, NUM_OPS):
         for level_ops in itertools.permutations(ALL_OPS, NUM_OPS):
-            for merge_op in MERGE_OPS:
-                for merged_ops in itertools.permutations(ALL_OPS, NUM_OPS):
+            for merged_ops in itertools.permutations(ALL_OPS, NUM_OPS):
+                for merge_op in MERGE_OPS:
                     idx += 1
                     pbar.update()
 
@@ -271,10 +314,10 @@ OP_RANGES = dict(
     mult=(
         list(
             itertools.chain(
-                numeric_range(0, 1, 0.1),
-                # numeric_range(1, 50, 3),
+                numeric_range(0, 5, 0.1),
+                # numeric_range(1, 50, 5),
                 # numeric_range(50, 200, 10),
-                # numeric_range(-5, 0, 0.5),
+                numeric_range(-5, 0, 0.5),
             )
         )
     ),
@@ -282,16 +325,17 @@ OP_RANGES = dict(
     add=(
         list(
             itertools.chain(
-                numeric_range(0, 5, 0.25),
-                # numeric_range(5, 100, 5),
-                # numeric_range(-100, 0, 5),
+                numeric_range(0, 5, 0.1),
+                # numeric_range(5, 50, 5),
+                numeric_range(-5, 0, 0.5),
+                # numeric_range(-100, -5, 5),
             )
         )
     ),
     exp=(
         list(
             itertools.chain(
-                numeric_range(0, 5, 0.25),
+                numeric_range(0, 5, 0.1),
                 # numeric_range(5, 10, 0.5),
             )
         )
@@ -299,7 +343,7 @@ OP_RANGES = dict(
     exp2=(
         list(
             itertools.chain(
-                numeric_range(0, 5, 0.25),
+                numeric_range(0, 5, 0.1),
                 # numeric_range(5, 100, 5),
             )
         )
@@ -308,13 +352,13 @@ OP_RANGES = dict(
 )
 
 
-def eval_candidate(
+async def eval_candidate(
     c: Candidate,
     base_raw: list[float],
     level_raw: list[float],
     values_raw: list[float],
-    batch_size=1_000_000,
-    thresh=0.01,
+    batch_size=100_000,
+    thresh=0.1,
 ):
     assert len(base_raw) == len(level_raw) == len(values_raw)
     n = len(base_raw)
@@ -328,15 +372,18 @@ def eval_candidate(
     print(c)
     sols = []
 
-    prod_iter = itertools.product(
-        *[
-            OP_RANGES[op]
-            for op in [
-                *c.base_ops,
-                *c.level_ops,
-                *c.merged_ops,
+    prod_iter = take_batches(
+        itertools.product(
+            *[
+                OP_RANGES[op]
+                for op in [
+                    *c.base_ops,
+                    *c.level_ops,
+                    *c.merged_ops,
+                ]
             ]
-        ]
+        ),
+        batch_size,
     )
 
     total = prod(
@@ -349,15 +396,16 @@ def eval_candidate(
             ]
         ]
     )
-    pbar = tqdm(total=total)
+    pbar = tqdm(total=total // 1000)
+
+    best: dict = dict()
 
     while True:
-        params = list(itertools.islice(prod_iter, batch_size))
-        pbar.update(len(params))
-
+        params = next(prod_iter, [])
         b = len(params)
         if b == 0:
             break
+
         params = (
             torch.tensor(params, dtype=torch.float)
             .to("cuda")
@@ -446,6 +494,18 @@ def eval_candidate(
         error = (error - x) ** 2
         error = error.mean(dim=0)
 
+        mn_idx: int = torch.argmin(error).item()  # type: ignore
+
+        await asyncio.get_running_loop().run_in_executor(
+            None,
+            torch.cuda.synchronize,
+        )
+        if not best or error[mn_idx].item() < best["error"]:
+            best = dict(
+                error=error[mn_idx].item(),
+                params=params[0, mn_idx, :].tolist(),
+            )
+
         for idx in range(b):
             if error[idx] < thresh:
                 print(
@@ -465,6 +525,17 @@ def eval_candidate(
                     )
                 )
 
+        pbar.update(b // 1000)
+        pbar.set_description(
+            " ".join(
+                [
+                    pp(best["error"]),
+                    "|",
+                    pp(best["params"]),
+                ]
+            )
+        )
+
     return sols
 
 
@@ -478,4 +549,4 @@ def pp(x: float | list[float]):
 
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())

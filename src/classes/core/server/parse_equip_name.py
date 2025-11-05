@@ -59,6 +59,8 @@ _PREFIXES = [
     "Savage",
     "Frugal",
     "Charged",
+    "Radiant",
+    "Mystic",
     #
     "Tempestuous",
     "Shocking",
@@ -165,6 +167,7 @@ _TYPES = [
     "Rapier",
     "Club",
     "Great Mace",
+    "Mace",
 ]
 
 _SUFFIX_ARTICLES = [
