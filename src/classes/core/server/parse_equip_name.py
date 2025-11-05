@@ -58,6 +58,7 @@ _PREFIXES = [
     "Reinforced",
     "Savage",
     "Frugal",
+    "Charged",
     #
     "Tempestuous",
     "Shocking",
@@ -155,6 +156,7 @@ _TYPES = [
     "Axe",
     "Scythe",
     "Shortsword",
+    "Swordchucks",
     "Katana",
     "Dagger",
     "Wakizashi",

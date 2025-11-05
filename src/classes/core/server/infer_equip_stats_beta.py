@@ -3,7 +3,7 @@ import loguru
 LOGGER = loguru.logger.bind(tags=["equip_parser"])
 
 _TIER_RANGES = dict(
-    Crude=(1, 30),
+    Crude=(1, 40),
     Fair=(30, 70),
     Average=(60, 100),
     Superior=(90, 130),

@@ -21,7 +21,11 @@ def parse_equip_html(html: str) -> dict:
     soup = BeautifulSoup(html, "lxml")
 
     name, alt_name = _parse_name(soup)
-    name_parts = parse_equip_name(name)
+    try:
+        name_parts = parse_equip_name(name)
+    except Exception:
+        LOGGER.exception(name)
+        name_parts = None
     category, level, is_tradeable = _parse_equip_category(soup)
     status = _parse_status(soup)
     weapon_damage = _parse_weapon_damage(soup)
