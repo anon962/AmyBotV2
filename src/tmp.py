@@ -1,10 +1,9 @@
 import asyncio
 import json
-import random
-import warnings
-from abc import ABC
+from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import TypeAlias
+from inspect import signature
+from typing import TypeAlias, TypeVar
 
 import numpy
 import scipy
@@ -18,10 +17,10 @@ from config.paths import DATA_DIR
 WORLD = "isekai"
 # WORLD = "persistent"
 
-FIT_TYPE = "curved"
+# FIT_TYPE = "curved"
 # FIT_TYPE = "plane"
 # FIT_TYPE = "wiki"
-# FIT_TYPE = "wiki2"
+FIT_TYPE = "wiki2"
 
 
 async def main():
@@ -38,9 +37,10 @@ async def main():
     items = list(counts.items())
     items.sort(key=lambda kv: len(kv[1]), reverse=True)
 
-    min_result_count = 15 if WORLD == "isekai" else 60
+    min_result_count = 10 if WORLD == "isekai" else 60
 
     # plots
+    missing_filters = set()
     for gid, group in items:
         if len(group) < min_result_count:
             continue
@@ -82,8 +82,11 @@ async def main():
             case "Slashing":
                 suffix_filters = ["Stoneskin", "Reinforced"]
             case _:
-                print(f"No known filter for:", gid[0])
+                missing_filters.add(gid[0])
                 continue
+
+        if gid[0] not in ["Block", "Parry"]:
+            continue
 
         group = [
             x
@@ -94,7 +97,7 @@ async def main():
             continue
 
         name = "_".join(str(x) for x in gid)
-        print(len(group), name)
+        print(f"{len(group)}x", name)
 
         best: tuple = None  # type: ignore
         for _ in range(100):
@@ -104,11 +107,11 @@ async def main():
                 if FIT_TYPE == "curved":
                     fit = CurvedPlaneFit.from_points(pts)
                 elif FIT_TYPE == "wiki":
-                    fit = WikiFit.from_points(*random.sample(pts, 5))
+                    fit = WikiFit.from_points(pts)
                 elif FIT_TYPE == "wiki2":
-                    fit = WikiFit2.from_points(*random.sample(pts, 5))
+                    fit = WikiFit2.from_points(pts)
                 else:
-                    fit = PlaneFit.from_points(*random.sample(pts, 3))
+                    fit = PlaneFit.from_points(pts)
             except Exception:
                 print("\tFailed to fit")
                 break
@@ -126,6 +129,8 @@ async def main():
         print("\tplane:", str(fit))
 
         plot(name, group, fit, loss)
+
+    print(f"Missing filters for:", missing_filters)
 
 
 def plot(name: str, group: list[dict], fit: "Fit", loss: float):
@@ -145,7 +150,7 @@ def plot(name: str, group: list[dict], fit: "Fit", loss: float):
     annotations = []
     for v in group:
         pred = fit.eval(v["base"], v["d"]["level"])
-        loss = (v["value"] - pred) ** 2
+        loss = abs((v["value"] - pred) / v["value"])
 
         d = dict(
             base=v["base"],
@@ -158,7 +163,7 @@ def plot(name: str, group: list[dict], fit: "Fit", loss: float):
         )
         data.append(d)
 
-        if loss > 4:
+        if loss > 0.01:
             annotations.append(
                 dict(
                     x=v["base"],
@@ -329,25 +334,67 @@ def tally(edb):
 Point2: TypeAlias = tuple[float, float]
 Point3: TypeAlias = tuple[float, float, float]
 
+T = TypeVar("T")
+
 
 @dataclass
 class Fit(ABC):
-    def eval(self, x, y): ...
+    params: list[float]
 
-    def eval_all(self, xys: list[Point2]) -> list[float]: ...
+    @staticmethod
+    @abstractmethod
+    def _eval(x: T, y: T, *params) -> T: ...
 
-    def calc_loss(self, xyzs: list[Point3]) -> float: ...
+    @classmethod
+    def from_points(cls, pts: list[Point3]):
+        def eval(pts, *args):
+            return cls._eval(pts[:, 0], pts[:, 1], *args)
+
+        arr = numpy.array(pts, dtype=numpy.float64)
+        result: tuple = scipy.optimize.curve_fit(
+            eval,
+            arr[:, :2],
+            arr[:, 2],
+            tuple(100 for _ in range(len(signature(cls._eval).parameters) - 2)),
+        )
+
+        return cls(result[0])
+
+    def eval(self, x, y):
+        return self._eval(x, y, *self.params)
+
+    def eval_all(self, xys: list[Point2]) -> list[float]:
+        xs = torch.tensor([u[0] for u in xys])
+        ys = torch.tensor([u[1] for u in xys])
+        zs = self.eval(xs, ys)
+        return zs.tolist()
+
+    def calc_loss(self, xyzs: list[tuple[float, float, float]]) -> float:
+        zs = torch.tensor([u[2] for u in xyzs])
+        preds = torch.tensor(self.eval_all([(u[0], u[1]) for u in xyzs]))
+
+        loss = (preds - zs).abs()
+        loss = loss.mean() / zs.mean()
+        loss = loss.item()
+        return loss
+
+    def __str__(self) -> str:
+        return " ".join([pp(p, 4) for p in self.params])
+
+    def __repr__(self) -> str:
+        return " ".join([str(p) for p in self.params])
 
 
 @dataclass
 class PlaneFit(Fit):
-    a: float
-    b: float
-    c: float
-    k: float
+    @staticmethod
+    def _eval(x, y, a, b, c, k):
+        return (a * x + b * y + k) / (-c + 1e-9)
 
     @classmethod
-    def from_points(cls, p0: Point3, p1: Point3, p2: Point3) -> "PlaneFit":
+    def from_points(cls, pts: list[Point3]) -> "PlaneFit":
+        p0, p1, p2 = pts
+
         u = (p1[0] - p0[0], p1[1] - p0[1], p1[2] - p0[2])
         v = (p2[0] - p0[0], p2[1] - p0[1], p2[2] - p0[2])
 
@@ -359,45 +406,23 @@ class PlaneFit(Fit):
 
         k = -1 * (cross[0] * p0[0] + cross[1] * p0[1] + cross[2] * p0[2])
 
-        return cls(
-            a=cross[0],
-            b=cross[1],
-            c=cross[2],
-            k=k,
-        )
-
-    def eval(self, x, y):
-        return (self.a * x + self.b * y + self.k) / (-self.c + 1e-9)
-
-    def eval_all(self, xys: list[Point2]) -> list[float]:
-        xs = torch.tensor([u[0] for u in xys])
-        ys = torch.tensor([u[1] for u in xys])
-        zs = (self.a * xs + self.b * ys + self.k) / (-self.c + 1e-9)
-        return zs.tolist()
-
-    def calc_loss(self, xyzs: list[tuple[float, float, float]]) -> float:
-        zs = torch.tensor([u[2] for u in xyzs])
-        preds = torch.tensor(self.eval_all([(u[0], u[1]) for u in xyzs]))
-
-        loss = (preds - zs) ** 2
-        loss = loss.mean().item()
-        return loss
+        return cls([cross[0], cross[1], cross[2], k])
 
     def __str__(self) -> str:
         return " ".join(
             [
-                pp(self.a / (-self.c + 1e-9)),
-                pp(self.b / (-self.c + 1e-9)),
-                pp(self.k / (-self.c + 1e-9)),
+                pp(self.params[0] / (-self.params[2] + 1e-9)),
+                pp(self.params[1] / (-self.params[2] + 1e-9)),
+                pp(self.params[3] / (-self.params[2] + 1e-9)),
             ]
         )
 
     def __repr__(self) -> str:
         return " ".join(
             [
-                str(self.a / (-self.c + 1e-9)),
-                str(self.b / (-self.c + 1e-9)),
-                str(self.k / (-self.c + 1e-9)),
+                str(self.params[0] / (-self.params[2] + 1e-9)),
+                str(self.params[1] / (-self.params[2] + 1e-9)),
+                str(self.params[3] / (-self.params[2] + 1e-9)),
             ]
         )
 
@@ -405,181 +430,37 @@ class PlaneFit(Fit):
 @dataclass
 class CurvedPlaneFit(Fit):
     """
-    z = k * (x+a) * (y+b) + c
-
-    wiki claims
-    z = x * (1 + y/k)
-    z = (1/k) * (x) * (y + k)
+    z = k(x+a)(y+b) + c
     """
 
-    a: float
-    b: float
-    c: float
-    k: float
-
-    @classmethod
-    def from_points(
-        cls,
-        pts: list[Point3],
-    ) -> "CurvedPlaneFit":
-        def eval(pts, a, b, c, k):
-            # 0 = k(x+a)(y+b) + c - z
-            return k * (pts[:, 0] + a) * (pts[:, 1] + b) + c
-
-        warnings.filterwarnings("ignore", "The iteration is not making good progress")
-
-        arr = numpy.array(pts, dtype=numpy.float64)
-        result: tuple = scipy.optimize.curve_fit(
-            eval,
-            arr[:, :2],
-            arr[:, 2],
-            (100, 100, 100, 100),
-        )
-
-        a, b, c, k = result[0]
-
-        return cls(a, b, c, k)
-
-    def eval(self, x, y):
-        return self.k * (x + self.a) * (y + self.b) + self.c
-
-    def eval_all(self, xys: list[Point2]) -> list[float]:
-        xs = torch.tensor([u[0] for u in xys])
-        ys = torch.tensor([u[1] for u in xys])
-        zs = self.eval(xs, ys).tolist()
-        return zs
-
-    def calc_loss(self, xyzs: list[tuple[float, float, float]]) -> float:
-        zs = torch.tensor([u[2] for u in xyzs])
-        preds = torch.tensor(self.eval_all([(u[0], u[1]) for u in xyzs]))
-
-        loss = (preds - zs) ** 2
-        loss = loss.mean().item()
-        return loss
-
-    def __str__(self) -> str:
-        return " ".join([pp(self.a), pp(self.b), pp(self.c), pp(self.k)])
-
-    def __repr__(self) -> str:
-        return " ".join([str(self.a), str(self.b), str(self.c), str(self.k)])
+    @staticmethod
+    def _eval(x, y, a, b, c, k):
+        return k * (x + a) * (y + b) + c
 
 
 @dataclass
 class WikiFit(Fit):
     """
     z = x * (1 + y/k)
-    z = (1/k) * (x) * (y + k)
     """
 
-    k: float
-
-    @classmethod
-    def from_points(cls, p0: Point3, p1, p2, p3, p4) -> "WikiFit":
-        def system_of_equations(u):
-            return [
-                p0[0] * (1 + p0[1] / u[0]) - p0[2],
-                # p1[0] * (1 + p1[1] / u[0]) - p1[2],
-                # p2[0] * (1 + p2[1] / u[0]) - p2[2],
-                # p3[0] * (1 + p3[1] / u[0]) - p3[2],
-                # p4[0] * (1 + p4[1] / u[0]) - p4[2],
-            ]
-
-        warnings.filterwarnings("ignore", "The iteration is not making good progress")
-        result: tuple = scipy.optimize.fsolve(system_of_equations, [35])
-
-        k = result[0]
-
-        return cls(k)
-
-    def eval(self, x, y):
-        return x * (1 + y / self.k)
-
-    def eval_all(self, xys: list[Point2]) -> list[float]:
-        xs = torch.tensor([u[0] for u in xys])
-        ys = torch.tensor([u[1] for u in xys])
-        zs = xs * (1 + ys / self.k)
-        return zs.tolist()
-
-    def calc_loss(self, xyzs: list[tuple[float, float, float]]) -> float:
-        zs = torch.tensor([u[2] for u in xyzs])
-        preds = torch.tensor(self.eval_all([(u[0], u[1]) for u in xyzs]))
-
-        loss = (preds - zs) ** 2
-        loss = loss.mean().item()
-        return loss
-
-    def __str__(self) -> str:
-        return " ".join([pp(self.k)])
-
-    def __repr__(self) -> str:
-        return " ".join([str(self.k)])
+    @staticmethod
+    def _eval(x, y, k):
+        return x * (1 + y / k)
 
 
 @dataclass
 class WikiFit2(Fit):
-    """
-    z = x * (1 + y/k)
-    z = (1/k) * (x) * (y + k)
-    """
+    params: list[float]
 
-    k1: float
-    k2: float
-
-    @classmethod
-    def from_points(cls, p0: Point3, p1, p2, p3, p4) -> "WikiFit2":
-        def system_of_equations(u):
-            return [
-                p0[0] / u[1] * (1 + p0[1] / u[0]) - p0[2],
-                p1[0] / u[1] * (1 + p1[1] / u[0]) - p1[2],
-                # p2[0] * (1 + p2[1] / u[0]) - p2[2],
-                # p3[0] * (1 + p3[1] / u[0]) - p3[2],
-                # p4[0] * (1 + p4[1] / u[0]) - p4[2],
-            ]
-
-        warnings.filterwarnings("ignore", "The iteration is not making good progress")
-        result: tuple = scipy.optimize.fsolve(system_of_equations, [1, 1])
-
-        k1, k2 = result
-
-        return cls(k1, k2)
-
-    def eval(self, x, y):
-        return x / self.k2 * (1 + y / self.k1)
-
-    def eval_all(self, xys: list[Point2]) -> list[float]:
-        xs = torch.tensor([u[0] for u in xys])
-        ys = torch.tensor([u[1] for u in xys])
-        zs = xs / self.k2 * (1 + ys / self.k1)
-        return zs.tolist()
-
-    def calc_loss(self, xyzs: list[tuple[float, float, float]]) -> float:
-        zs = torch.tensor([u[2] for u in xyzs])
-        preds = torch.tensor(self.eval_all([(u[0], u[1]) for u in xyzs]))
-
-        loss = (preds - zs) ** 2
-        loss = loss.mean().item()
-        return loss
-
-    def __str__(self) -> str:
-        return " ".join(
-            [
-                pp(self.k1),
-                pp(self.k2),
-            ]
-        )
-
-    def __repr__(self) -> str:
-        return " ".join(
-            [
-                str(self.k1),
-                str(self.k2),
-            ]
-        )
+    @staticmethod
+    def _eval(x, y, c1, k2):
+        return 0.0015 * (x + c1) * (k2 * y)
 
 
-def pp(x: float | list[float] | tuple[float, ...]):
+def pp(x: float | list[float] | tuple[float, ...], n=3):
     if isinstance(x, float):
-        return f"{x:.3f}"
+        return f"{x:.{n}f}"
     elif isinstance(x, (list, tuple)):
         return ", ".join(pp(y) for y in x)
     else:
