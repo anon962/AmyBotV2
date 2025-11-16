@@ -40,7 +40,11 @@ def _calc_all_percentiles(
 
     if equip["weapon_damage"] and equip["weapon_damage"]["Attack Damage"]:
         base = equip["weapon_damage"]["Attack Damage"]["base"]
-        percentiles["weapon_damage"] = {"Attack Damage": (base - mn) / ivl_length}
+
+        if ivl_length > 0:
+            percentiles["weapon_damage"] = {"Attack Damage": (base - mn) / ivl_length}
+        else:
+            percentiles["weapon_damage"] = 1
 
     for cat, stats in equip["stats"].items():
         percentiles[cat] = dict()

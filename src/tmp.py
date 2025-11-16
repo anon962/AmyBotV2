@@ -1,18 +1,27 @@
 import asyncio
 import json
+import math
+import random
+import statistics
+import warnings
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from inspect import signature
 from typing import TypeAlias, TypeVar
 
 import numpy
+import pandas
+import plotly.express as px
+import plotly.graph_objects as go
 import scipy
 import scipy.optimize
 import torch
 
-from classes.core.server.parse_equip_name import parse_equip_name
+from classes.core.server.parse_equip_name import SLOT_LOCS, parse_equip_name
 from classes.db import init_db
 from config.paths import DATA_DIR
+
+warnings.filterwarnings("ignore")
 
 WORLD = "isekai"
 # WORLD = "persistent"
@@ -22,9 +31,14 @@ WORLD = "isekai"
 # FIT_TYPE = "wiki"
 FIT_TYPE = "wiki2"
 
+MIN_RESULT_COUNT = 5 if WORLD == "isekai" else 60
+
 
 async def main():
     edb = init_db()
+
+    tmp(edb)
+    return
 
     counts = tally(edb)
 
@@ -35,65 +49,141 @@ async def main():
         fp.unlink()
 
     items = list(counts.items())
-    items.sort(key=lambda kv: len(kv[1]), reverse=True)
-
-    min_result_count = 10 if WORLD == "isekai" else 60
+    # items.sort(key=lambda kv: len(kv[1]), reverse=True)
+    # items.sort(key=lambda kv: (kv[0][0], len(kv[1])))
+    items.sort(
+        key=lambda kv: (
+            kv[1][0]["name_parts"]["type"].split()[0],
+            kv[1][0]["stat_name"],
+        )
+    )
 
     # plots
     missing_filters = set()
+    results: list = []
     for gid, group in items:
-        if len(group) < min_result_count:
+        if len(group) < MIN_RESULT_COUNT:
             continue
 
-        suffix_filters = []
+        affix_filters = []
         match gid[0]:
             case "Physical Mitigation":
-                suffix_filters = ["Protection"]
+                affix_filters = ["Protection"]
             case "Magical Mitigation":
-                suffix_filters = ["Warding"]
+                affix_filters = ["Warding"]
             case "Block":
-                suffix_filters = ["Shielding", "Barrier"]
+                affix_filters = ["Shielding", "Barrier"]
             case "Parry":
-                suffix_filters = ["Nimble"]
+                affix_filters = ["Nimble"]
             case "Attack Crit Damage":
-                suffix_filters = ["Balance"]
+                affix_filters = ["Balance", "Savage"]
             case "Attack Accuracy":
-                suffix_filters = ["Balance"]
+                affix_filters = ["Balance"]
             case "Magic Damage":
-                suffix_filters = ["Radiant", "Destruction"]
+                affix_filters = ["Radiant", "Destruction"]
             case "Magic Accuracy":
-                suffix_filters = ["Focus"]
+                affix_filters = ["Focus"]
             case "Evade Chance":
-                suffix_filters = ["Fleet"]
-            case "Intelligence":
-                suffix_filters = ["Owl"]
+                affix_filters = ["Fleet"]
             case "Burden":
-                suffix_filters = ["Mithril"]
-            case "Wisdom":
-                suffix_filters = []
-            case "Agility":
-                suffix_filters = []
+                affix_filters = ["Mithril"]
             case "Interference":
-                suffix_filters = ["Mithril"]
+                affix_filters = ["Mithril"]
             case "Crushing":
-                suffix_filters = ["Dampening", "Reinforced"]
+                affix_filters = ["Dampening", "Reinforced"]
             case "Piercing":
-                suffix_filters = ["Deflection", "Reinforced"]
+                affix_filters = ["Deflection", "Reinforced"]
             case "Slashing":
-                suffix_filters = ["Stoneskin", "Reinforced"]
+                affix_filters = ["Stoneskin", "Reinforced"]
+            case "Strength":
+                affix_filters = ["Ox"]
+            case "Dexterity":
+                affix_filters = ["Raccoon"]
+            case "Endurance":
+                affix_filters = ["Turtle"]
+            case "Agility":
+                affix_filters = ["Cheetah"]
+            case "Wisdom":
+                affix_filters = ["Owl"]
+            case "Intelligence":
+                affix_filters = ["Fox"]
+            case "Divine":
+                affix_filters = ["Heaven-sent"]
+            case "Elemental":
+                affix_filters = ["Elementalist"]
+            case "Deprecating":
+                affix_filters = ["Curse-weaver"]
+            case "Supportive":
+                affix_filters = ["Earth-walker"]
+            case "Divine":
+                affix_filters = ["Heaven-sent"]
+            case "Fire EDB":
+                # affix_filters = ["Surtr"]
+                pass
+            case "Wind EDB":
+                # affix_filters = ["Freyr"]
+                pass
+            case "Elec EDB":
+                # affix_filters = ["Mjolnir"]
+                pass
+            case "Holy EDB":
+                # affix_filters = ["Heimdall"]
+                pass
+            case "Dark EDB":
+                # affix_filters = ["Fenrir"]
+                pass
+            case "Cold EDB":
+                # affix_filters = ["Niflheim"]
+                pass
+            case "Attack Damage":
+                affix_filters = ["Savage", "Slaughter"]
+                pass
             case _:
                 missing_filters.add(gid[0])
                 continue
 
-        if gid[0] not in ["Block", "Parry"]:
+        STAT_FILTERS = [
+            # "Block",
+            # "Parry",
+            # "Magical Mitigation",
+            # "Physical Mitigation",
+            # "Strength",
+            # "Dexterity",
+            # "Intelligence",
+            # "Fire EDB",
+            # "Wind EDB",
+            # "Elec EDB",
+            # "Holy EDB",
+            # "Dark EDB",
+            # "Cold EDB",
+            "Attack Damage",
+        ]
+        if STAT_FILTERS and gid[0] not in STAT_FILTERS:
+            continue
+
+        loc_mult = 1
+        if False:
+            pass
+        if group[0]["name_parts"]["type"] in SLOT_LOCS["HEAD"]:
+            loc_mult = 1.26
+        elif group[0]["name_parts"]["type"] in SLOT_LOCS["BODY"]:
+            loc_mult = 1.51333
+        elif group[0]["name_parts"]["type"] in SLOT_LOCS["HANDS"]:
+            loc_mult = 1.13555
+        elif group[0]["name_parts"]["type"] in SLOT_LOCS["LEGS"]:
+            loc_mult = 1.386666
+        elif group[0]["name_parts"]["type"] in SLOT_LOCS["FEET"]:
+            loc_mult = 1
+        else:
             continue
 
         group = [
             x
             for x in group
-            if all(x["name_parts"]["suffix"] != y for y in suffix_filters)
+            if x["name_parts"]["suffix"] not in affix_filters
+            and x["name_parts"]["prefix"] not in affix_filters
         ]
-        if len(group) < min_result_count:
+        if len(group) < MIN_RESULT_COUNT:
             continue
 
         name = "_".join(str(x) for x in gid)
@@ -102,6 +192,7 @@ async def main():
         best: tuple = None  # type: ignore
         for _ in range(100):
             pts = [(x["base"], x["d"]["level"], x["value"]) for x in group]
+            # start = random.random() * 100
 
             try:
                 if FIT_TYPE == "curved":
@@ -109,12 +200,53 @@ async def main():
                 elif FIT_TYPE == "wiki":
                     fit = WikiFit.from_points(pts)
                 elif FIT_TYPE == "wiki2":
-                    fit = WikiFit2.from_points(pts)
+                    match gid[0]:
+                        case (
+                            "Agility"
+                            | "Strength"
+                            | "Dexterity"
+                            | "Endurance"
+                            | "Intelligence"
+                            | "Wisdom"
+                        ):
+                            denom = 35.7143
+                        case "Parry" | "Block":
+                            denom = 200
+                        case "Attack Accuracy" | "Magic Accuracy":
+                            denom = 50
+                        case (
+                            "Crushing"
+                            | "Piercing"
+                            | "Slashing"
+                            | "Interference"
+                            | "Burden"
+                        ):
+                            denom = 999_999
+                        case "Physical Mitigation" | "Magical Mitigation":
+                            denom = 2000
+                        case (
+                            "Fire EDB"
+                            | "Wind EDB"
+                            | "Elec EDB"
+                            | "Holy EDB"
+                            | "Dark EDB"
+                            | "Cold EDB"
+                        ):
+                            denom = 200
+                        case "Attack Damage":
+                            denom = 16.6
+                        case _:
+                            print("No denom for:", gid[0])
+                            break
+
+                    fit = WikiFit2.from_points(pts, denom, loc_mult)
                 else:
                     fit = PlaneFit.from_points(pts)
             except Exception:
-                print("\tFailed to fit")
-                break
+                # import traceback
+
+                # traceback.print_exc()
+                continue
 
             loss = fit.calc_loss(pts)
 
@@ -122,22 +254,204 @@ async def main():
                 best = (loss, fit)
 
         if not best:
+            print("\tFailed to fit")
             continue
 
         loss, fit = best
-        print("\tloss:", pp(loss))
-        print("\tplane:", str(fit))
+        print(
+            "\tloss:",
+            pp(loss),
+            "mean:",
+            pp(statistics.mean([x["value"] for x in group])),
+        )
+        print("\tfit:", str(fit))
 
+        results.append((fit, group[0], loss))
         plot(name, group, fit, loss)
 
     print(f"Missing filters for:", missing_filters)
 
+    plot_all_fits(*zip(*results))
+
+
+def tmp(edb):
+    def dump(name: str, pts: list[tuple[float, float]]):
+        pts_str = ",".join(f"({pt[0]},{pt[1]})" for pt in pts)
+        print(
+            f"""
+            {name}=[{pts_str}]
+            """.strip()
+        )
+
+    # armor_type = "leather"
+    # slots = [
+    #     "boots",
+    #     "leggings",
+    #     "gauntlets",
+    #     "breastplate",
+    #     "helmet",
+    # ]
+    armor_type = "plate"
+    slots = [
+        "sabatons",
+        "greaves",
+        "gauntlets",
+        "cuirass",
+        "helmet",
+    ]
+
+    def select(name):
+        stats = dict()
+
+        rs = edb.execute(
+            f"""
+            SELECT data FROM equips
+            WHERE is_isekai = 1
+            AND JSON_EXTRACT(data, '$.owner.name') IS NOT NULL
+            AND JSON_EXTRACT(data, '$.name') LIKE '%{name}%'
+            AND JSON_EXTRACT(data, '$.level') = 'Unassigned'
+            AND updated_at > '2025-11-05T13'
+            -- AND updated_at < '2025-11-05T13'
+            """
+        ).fetchall()
+
+        for r in rs:
+            d = json.loads(r["data"])
+
+            for cat_name, cat in d["stats"].items():
+                for stat_name, stat in cat.items():
+                    stats.setdefault(stat_name, dict())
+
+                    s = dict(
+                        stat_name=stat_name,
+                        base=stat["base"] / 2,
+                        value=stat["value"],
+                        name=d["name"],
+                    )
+
+                    old = stats[stat_name].get(s["base"], dict()).get("value", None)
+                    if old and s["value"] > old:
+                        continue
+
+                    stats[stat_name][s["base"]] = s
+
+        result = dict()
+        for stat_name, by_base in stats.items():
+            as_list = sorted(list(by_base.values()), key=lambda x: x["base"])
+            result[stat_name] = as_list
+
+        return result
+
+    for eq in [
+        # dict(key="h_n", name="Plate Cuirass", stat="Physical Mitigation", filter="Protection"),
+        # dict(key="h_r", name="Power Armor", stat="Physical Mitigation", filter="Protection"),
+        # dict(key="m_n", name="Leather Breastplate", stat="Physical Mitigation", filter="Protection"),
+        # dict(key="m_r", name="Shade Breastplate", stat="Physical Mitigation", filter="Protection"),
+        # dict(key="l_n", name="Cotton Robe", stat="Physical Mitigation", filter="Protection"),
+        # dict(key="l_r", name="Phase Robe", stat="Physical Mitigation", filter="Protection"),
+        # 
+        # dict(key="h_n", name="Plate Cuirass", stat="Endurance", filter="Turtle"),
+        # dict(key="h_r", name="Power Armor", stat="Endurance", filter="Turtle"),
+        # dict(key="m_n", name="Leather Breastplate", stat="Endurance", filter="Turtle"),
+        # dict(key="m_r", name="Shade Breastplate", stat="Endurance", filter="Turtle"),
+        # dict(key="l_n", name="Cotton Robe", stat="Endurance", filter="Turtle"),
+        # dict(key="l_r", name="Phase Robe", stat="Endurance", filter="Turtle"),
+        # 
+        # dict(key="l_n", name="Cotton Shoes", stat="Physical Mitigation", filter="Protection"),
+        dict(key="l_n", name="Leather Boots", stat="Endurance", filter="Turtle"),
+        dict(key="l_n", name="Plate Sabatons", stat="Endurance", filter="Turtle"),
+        dict(key="l_n", name="Plate Sabatons", stat="Strength", filter="Turtle"),
+        dict(key="l_n", name="Plate Sabatons", stat="Dexterity", filter="Turtle"),
+    ]: # fmt: skip
+        vals = select(eq["name"])
+        vals = vals.get(eq["stat"], [])
+        vals = [v for v in vals if eq["filter"] not in v["name"]]
+        dump(eq["key"], [(v["base"], v["value"]) for v in vals])
+
+    # for idx, slot in enumerate(slots):
+    #     vals = select(f"{armor_type} {slot}")
+    #     vals = vals['Physical Mitigation']
+    #     vals = [v for v in vals if "Protection" not in v["name"]]
+    #     dump(f"p_{{{idx}}}", [(v['base'], v['value']) for v in vals])
+    # for idx in range(len(slots)):
+    #     print(
+    #         rf"p_{{{idx}}}.y\ \sim\ a_{{p}}b\left(c_{{p}}\cdot p_{{{idx}}}.x+1\right)^{{1.5}}"
+    #     )
+
+    # for idx, slot in enumerate(slots):
+    #     vals = select(f"{armor_type} {slot}")
+    #     vals = vals['Magical Mitigation']
+    #     vals = [v for v in vals if "Warding" not in v["name"]]
+    #     dump(f"p_{{{idx}}}", [(v['base'], v['value']) for v in vals])
+    # for idx in range(len(slots)):
+    #     print(
+    #         rf"m_{{{idx}}}.y\ \sim\ a_{{m}}b\left(c_{{m}}\cdot m_{{{idx}}}.x+1\right)^{{1.5}}"
+    #     )
+
+
+def tmp2(edb):
+    rs = edb.execute(
+        """
+        SELECT data FROM equips
+        WHERE is_isekai = 1
+        """
+    ).fetchall()
+
+    acc = dict()
+
+    for r in rs:
+        d = json.loads(r["data"])
+
+        name_parts = parse_equip_name(d["name"])
+
+        level = 1 if d["level"] == "Unassigned" else d["level"]
+        if level == "Soulbound":
+            continue
+
+        for cat_name, cat in d["stats"].items():
+            for stat_name, stat in cat.items():
+                k = (stat_name, name_parts["type"], stat["base"])
+                if stat["base"] == 0:
+                    continue
+
+                acc.setdefault(k, dict())
+                a = acc[k]
+
+                a[level] = dict(
+                    stat_name=stat_name,
+                    type=name_parts["type"],
+                    suffix=name_parts["suffix"],
+                    prefix=name_parts["prefix"],
+                    level=level,
+                    base=stat["base"],
+                    value=stat["value"],
+                )
+
+    vss = [list(vs.values()) for vs in acc.values()]
+    vss.sort(key=lambda vs: len(vs), reverse=True)
+    print(len(vss[0]), vss[0][0])
+
+    for vs in vss[:10]:
+        print(vs[0]["stat_name"], vs[0]["type"], vs[0]["base"])
+        vs.sort(key=lambda v: v["level"])
+
+        for v in vs:
+            print(
+                ", ".join(
+                    [
+                        str(v["base"]),
+                        str(v["level"]),
+                        str(v["value"]),
+                        (v["prefix"] or "") + "|" + (v["suffix"] or ""),
+                    ]
+                )
+            )
+
+        print("---")
+        # break
+
 
 def plot(name: str, group: list[dict], fit: "Fit", loss: float):
-    import pandas
-    import plotly.express as px
-    import plotly.graph_objects as go
-
     lines = []
     lines.append(f"{fit.__class__} {loss} | {repr(fit)}")
 
@@ -202,12 +516,15 @@ def plot(name: str, group: list[dict], fit: "Fit", loss: float):
             annotations=annotations,
         ),
     )
+    fig.update_traces(
+        # marker_size=8,
+    )
 
-    min_base = min(v["base"] for v in group)
+    min_base = min(v["base"] for v in group) - 1e-3
     max_base = max(v["base"] for v in group)
     x = numpy.arange(min_base * 0.9, max_base * 1.1, (max_base - min_base) / 100)
 
-    min_level = min(v["d"]["level"] for v in group)
+    min_level = min(v["d"]["level"] for v in group) - 1e-3
     max_level = max(v["d"]["level"] for v in group)
     y = numpy.arange(min_level * 0.9, max_level * 1.1, (max_level - min_level) / 100)
 
@@ -234,6 +551,108 @@ def plot(name: str, group: list[dict], fit: "Fit", loss: float):
     (DATA_DIR / "tmp" / f"{name}.data").write_text("\n".join(lines))
 
 
+def plot_all_fits(fits: "tuple[Fit]", samples: tuple[dict], loss: tuple[float]):
+    bad_count = 0
+
+    data = []
+    for idx, f in enumerate(fits):
+        l = loss[idx]
+        if math.isnan(l):
+            bad_count += 1
+            continue
+
+        x = f.params[0]
+
+        if len(f.params) > 1:
+            y = f.params[1]
+        else:
+            y = 0
+
+        if len(f.params) > 2:
+            z = f.params[2]
+        else:
+            z = 0
+
+        if any(u > 100_000 for u in [x, y, z]):
+            continue
+
+        s = samples[idx]
+        data.append(
+            dict(
+                label="_".join(
+                    (
+                        s["stat_name"],
+                        s["name_parts"]["type"],
+                    )
+                ),
+                x=x,
+                y=y,
+                z=z,
+                loss=l,
+                slot=next(
+                    kv[0]
+                    for kv in SLOT_LOCS.items()
+                    if s["name_parts"]["type"] in kv[1]
+                ),
+            )
+        )
+
+    while True:
+        to_remove = None
+
+        mean = [statistics.mean([d[k] for d in data]) for k in ["x", "y", "z"]]
+        stdev = [statistics.stdev([d[k] for d in data]) for k in ["x", "y", "z"]]
+        for d in data:
+            for idx, k in enumerate(["x", "y", "z"]):
+                if (
+                    d[k] < mean[idx] - 4 * stdev[idx]
+                    or d[k] > mean[idx] + 4 * stdev[idx]
+                ):
+                    to_remove = d
+                    break
+            if to_remove:
+                break
+
+        if to_remove:
+            data = [d for d in data if d is not to_remove]
+            bad_count += 1
+        else:
+            break
+
+    print(f"Ignored {bad_count} / {len(data) + bad_count} param samples")
+
+    print("avg loss:", statistics.mean(loss))
+
+    for d in data:
+        num_neighbors = len(
+            [
+                d2
+                for d2 in data
+                if 10
+                > math.sqrt(
+                    (d["x"] - d2["x"]) ** 2
+                    + (d["y"] - d2["y"]) ** 2
+                    + (d["z"] - d2["z"]) ** 2
+                )
+            ]
+        )
+        d["size"] = math.sqrt(num_neighbors)
+
+    df = pandas.DataFrame(data)
+    fig = px.scatter_3d(
+        df,
+        x="x",
+        y="y",
+        z="z",
+        # color="loss",
+        color="slot",
+        size="size",
+        hover_data=list(data[0].keys()),
+    )
+
+    fig.write_html(DATA_DIR / "tmp" / f"000_params.html")
+
+
 def tally(edb):
     if WORLD == "isekai":
         rs = edb.execute(
@@ -241,6 +660,8 @@ def tally(edb):
             SELECT id, key, data
             FROM equips
             WHERE is_isekai = 1
+            AND JSON_EXTRACT(data, '$.owner.name') IS NOT NULL
+            AND updated_at > '2025-11-05T13'
             """
         )
     else:
@@ -269,6 +690,8 @@ def tally(edb):
             continue
         seen.add(d["id"])
 
+        if d["level"] == "Unassigned":
+            d["level"] = 1
         if not isinstance(d["level"], int):
             continue
         # if d["level"] >= 50:
@@ -276,6 +699,9 @@ def tally(edb):
 
         for cat_name, cat in d["stats"].items():
             for stat_name, stat in cat.items():
+                if cat_name == "Spell Damage":
+                    stat_name += " EDB"
+
                 # if stat_name != "Crushing":
                 #     continue
                 if stat["base"] == 0:
@@ -316,7 +742,10 @@ def tally(edb):
         max(len(str(k[idx] or "")) for k, cs in items)
         for idx in range(len(items[0][0]))
     ]
-    for k, vs in items[-20:]:
+    for k, vs in items:
+        if len(vs) < MIN_RESULT_COUNT:
+            continue
+
         vs = sorted([v["base"] for v in vs], key=lambda v: v)
         vs = list(vs)
 
@@ -355,7 +784,11 @@ class Fit(ABC):
             eval,
             arr[:, :2],
             arr[:, 2],
-            tuple(100 for _ in range(len(signature(cls._eval).parameters) - 2)),
+            tuple(
+                random.choice([0, 10, 100])
+                for _ in range(len(signature(cls._eval).parameters) - 2)
+            ),
+            # bounds=(0, numpy.inf),
         )
 
         return cls(result[0])
@@ -373,13 +806,13 @@ class Fit(ABC):
         zs = torch.tensor([u[2] for u in xyzs])
         preds = torch.tensor(self.eval_all([(u[0], u[1]) for u in xyzs]))
 
-        loss = (preds - zs).abs()
-        loss = loss.mean() / zs.mean()
+        loss = ((preds - zs) / zs).abs()
+        loss = loss.mean()
         loss = loss.item()
         return loss
 
     def __str__(self) -> str:
-        return " ".join([pp(p, 4) for p in self.params])
+        return " ".join([pp(p, 5) for p in self.params])
 
     def __repr__(self) -> str:
         return " ".join([str(p) for p in self.params])
@@ -451,11 +884,95 @@ class WikiFit(Fit):
 
 @dataclass
 class WikiFit2(Fit):
+    """
+    x * (k2 * y + 1)             -- current
+    (k1 * x + c1) * (k2 * y + 1) -- good, all low loss, semi-consistent constants
+    k1 * (x + c1) * (y + 1)      -- bad, high loss
+    k1 * (x + c1) * (k2 * y + 1) -- also good, but equivalent to (1), exposes some consistency in c1
+    k3 * (k1 * x) * (k2 * y + 1) -- meh, ~10% loss but some consistentcy wrt to slot and stat
+
+    hypothesis:
+        scaling = f(base, ...) * g(level, ...)
+
+        g(level, ...) is same as before
+        still depends on stat_group
+
+        f(base, ...) depends on
+            slot location (head, body, gloves, etc)
+                this is a constant multiplier
+                    feet    1
+                    hands   1.13555556
+                    head    1.26
+                    legs    1.38666
+                    body    1.5133
+
+            slot series (leather, cotton, plate, etc)
+            stat (int, wis, str, etc)
+                this controls the min and max values
+                probably unique for each (slot_series, stat) pair
+                maybe modeled as mult*base + offset
+
+            stat group (pabs, edb, mits, etc)
+                admin confirms this exists
+                seems redundant if the (slot_series, stat) constants exist
+                but ive confirmed that pabs on the same equip scale differently
+                so both must exist
+
+            so in summary...
+                slot location       => body armor is always N-times better than shoes
+                (slot_series, stat) => min / max values (?)
+                stat_group          => scaling rate (?)
+
+        scaling is confirmed to be slightly non-linear
+    """
+
     params: list[float]
+    denom: float
+    loc_mult: float
 
     @staticmethod
-    def _eval(x, y, c1, k2):
-        return 0.0015 * (x + c1) * (k2 * y)
+    def _eval(
+        x,
+        y,
+        denom,
+        loc_mult,
+        #
+        # k,
+        m,
+        b,
+        # k,
+        # c,
+        # k3,
+    ):
+        level_term = y / denom + 1
+        # base_term = 1.22 ** (0.031 * x + b)
+        base_term = 1.22 ** (x * m + b)
+        return loc_mult * base_term * level_term
+
+    def eval(self, x, y):
+        return self._eval(x, y, self.denom, self.loc_mult, *self.params)
+
+    @classmethod
+    def from_points(cls, pts: list[Point3], denom: float, loc_mult: float):
+        def eval(pts, *args):
+            return cls._eval(pts[:, 0], pts[:, 1], denom, loc_mult, *args)
+
+        arr = numpy.array(pts, dtype=numpy.float64)
+        result: tuple = scipy.optimize.curve_fit(
+            eval,
+            arr[:, :2],
+            arr[:, 2],
+            (
+                # random.choice([0, 10, 100])
+                # for _ in range(len(signature(cls._eval).parameters) - 4)
+                # 5.0 * random.random(),
+                5.0 * random.random(),
+                5.0 * random.random(),
+            ),
+            bounds=(-10, 100),
+        )
+
+        return cls(result[0], denom, loc_mult)
 
 
 def pp(x: float | list[float] | tuple[float, ...], n=3):

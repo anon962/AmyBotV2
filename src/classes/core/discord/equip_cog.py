@@ -1,10 +1,10 @@
 import copy
+import itertools
 import re
 from dataclasses import dataclass
 from datetime import datetime
 from functools import partial
 from typing import Any, Callable, Literal, Optional
-from unicodedata import name
 
 import requests
 import tomli
@@ -31,6 +31,7 @@ from classes.core.discord.keywords import (
     YearKey,
 )
 from classes.core.discord.table import Col, Table, clip
+from classes.core.server.parse_equip_name import PREFIXES, SUFFIXES, TIERS, TYPES
 from config import logger
 from config.paths import CONFIG_DIR
 from utils.discord import alias_by_prefix, extract_quoted, paginate
@@ -309,7 +310,9 @@ Everything after the equip name ("peerless staff") is optional
         return data["name"]
 
     async def _equip(
-        self, params: types._Equip.FetchParams, opts: types._Equip.FormatOptions
+        self,
+        params: types._Equip.FetchParams,
+        opts: types._Equip.FormatOptions,
     ) -> list[str]:
         async def main():
             # Fetch data
@@ -317,6 +320,17 @@ Everything after the equip name ("peerless staff") is optional
             params_ = params.copy()
             opts_ = copy.deepcopy(opts)
             items = await fetch_equips(self.bot.api_url, params_)
+
+            # If no results, try unabbreviating PHOH, PTWD, etc
+            if len(items) == 0:
+                candidates = unabbreviate(params.get("name", ""))
+                if candidates:
+                    for c in candidates:
+                        params__ = params.copy()
+                        params__["name"] = c
+                        items.extend(await fetch_equips(self.bot.api_url, params__))
+
+                    warning_params = f"(Also searched for {', '.join(candidates)})"
 
             # If no results, allow partial seller
             if len(items) == 0 and params.get("seller"):
@@ -737,3 +751,37 @@ async def fetch_spellcheck(api_url: URL, equip_name: str):
 
     resp = await do_get(url, content_type="json")
     return resp
+
+
+def unabbreviate(name: str) -> list[str]:
+    """
+    phoh -> peerless hallowed oak staff of heimdall
+    """
+
+    name = name.strip().lower()
+
+    find = lambda char, opts: [x for x in opts if x.lower().startswith(char)]
+
+    if len(name) == 3:
+        tiers = [""]
+        prefixes = find(name[0], PREFIXES)
+        types = find(name[1], TYPES)
+        suffixes = find(name[2], SUFFIXES)
+    elif len(name) == 4:
+        tiers = find(name[0], TIERS)
+        prefixes = find(name[1], PREFIXES)
+        types = find(name[2], TYPES)
+        suffixes = find(name[3], SUFFIXES)
+    else:
+        return []
+
+    candidates = [
+        " ".join(x)
+        for x in itertools.product(
+            tiers,
+            prefixes,
+            types,
+            suffixes,
+        )
+    ]
+    return candidates

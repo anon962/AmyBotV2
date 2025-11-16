@@ -55,7 +55,7 @@ server.add_middleware(GZipWrapper)
 server.add_middleware(PerformanceLog)
 server.add_middleware(RequestLog)
 
-EXPORTED_TABLES = ['super_auctions', 'super_equips', 'super_mats', 'super_fails', 'kedama_auctions' ,'kedama_equips', 'kedama_mats', 'kedama_fails_item', 'lottery_weapon', 'lottery_armor']  # fmt: skip
+EXPORTED_TABLES = ['super_auctions', 'super_equips', 'super_mats', 'super_fails', 'kedama_auctions' ,'kedama_equips', 'kedama_mats', 'kedama_fails_item', 'lottery_weapon', 'lottery_armor', 'equips']  # fmt: skip
 
 
 @server.get("/super/search_equips")

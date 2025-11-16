@@ -2,11 +2,11 @@ def parse_equip_name(name: str) -> dict:
     rem = name.lower().strip()
 
     try:
-        tier, rem = _find(rem, _TIERS, raise_on_missing=True)
-        prefix, rem = _find(rem, _PREFIXES)
-        type, rem = _find(rem, _TYPES, raise_on_missing=True)
-        suf_art, rem = _find(rem, _SUFFIX_ARTICLES)
-        suffix, rem = _find(rem, _SUFFIXES)
+        tier, rem = _find(rem, TIERS, raise_on_missing=True)
+        prefix, rem = _find(rem, PREFIXES)
+        type, rem = _find(rem, TYPES, raise_on_missing=True)
+        suf_art, rem = _find(rem, SUFFIX_ARTICLES)
+        suffix, rem = _find(rem, SUFFIXES)
     except:
         raise Exception((name, rem))
 
@@ -32,7 +32,7 @@ def _find(rem: str, opts: list[str], raise_on_missing=False):
             return None, rem.strip()
 
 
-_TIERS = [
+TIERS = [
     "Crude",
     "Fair",
     "Average",
@@ -44,7 +44,7 @@ _TIERS = [
 ]
 
 
-_PREFIXES = [
+PREFIXES = [
     "Onyx",
     "Mithril",
     "Ruby",
@@ -71,59 +71,43 @@ _PREFIXES = [
     "Demonic",
 ]
 
-_TYPES = [
+TYPES = [
+    #
     "Kevlar Helmet",
     "Kevlar Breastplate",
     "Kevlar Gauntlets",
-    "Kevlar Boots",
     "Kevlar Leggings",
+    "Kevlar Boots",
     #
     "Shade Helmet",
-    "Shade Boots",
-    "Shade Leggings",
     "Shade Breastplate",
     "Shade Gauntlets",
+    "Shade Leggings",
+    "Shade Boots",
     #
     "Leather Helmet",
-    "Leather Boots",
-    "Leather Leggings",
     "Leather Breastplate",
     "Leather Gauntlets",
+    "Leather Leggings",
+    "Leather Boots",
     #
     "Power Helmet",
-    "Power Leggings",
-    "Power Gauntlets",
-    "Power Boots",
     "Power Armor",
+    "Power Gauntlets",
+    "Power Leggings",
+    "Power Boots",
     #
-    "Plate Sabatons",
-    "Plate Greaves",
-    "Plate Cuirass",
     "Plate Helmet",
+    "Plate Cuirass",
     "Plate Gauntlets",
+    "Plate Greaves",
+    "Plate Sabatons",
     #
-    "Reactive Sabatons",
-    "Reactive Greaves",
-    "Reactive Cuirass",
     "Reactive Helmet",
+    "Reactive Cuirass",
     "Reactive Gauntlets",
-    #
-    "Willow Staff",
-    "Redwood Staff",
-    "Oak Staff",
-    "Ebony Staff",
-    "Katalox Staff",
-    #
-    "Chain Helmet",
-    "Chain Sabatons",
-    "Chain Cuirass",
-    "Chain Greaves",
-    "Chain Gauntlets",
-    #
-    "Force Shield",
-    "Tower Shield",
-    "Kite Shield",
-    "Buckler",
+    "Reactive Greaves",
+    "Reactive Sabatons",
     #
     "Cotton Cap",
     "Cotton Robe",
@@ -131,11 +115,23 @@ _TYPES = [
     "Cotton Pants",
     "Cotton Shoes",
     #
+    "Chain Helmet",
+    "Chain Cuirass",
+    "Chain Gauntlets",
+    "Chain Greaves",
+    "Chain Sabatons",
+    #
     "Phase Cap",
     "Phase Robe",
     "Phase Gloves",
     "Phase Pants",
     "Phase Shoes",
+    #
+    "Ironsilk Cap",
+    "Ironsilk Robe",
+    "Ironsilk Gloves",
+    "Ironsilk Pants",
+    "Ironsilk Shoes",
     #
     "Gossamer Cap",
     "Gossamer Robe",
@@ -143,17 +139,22 @@ _TYPES = [
     "Gossamer Pants",
     "Gossamer Shoes",
     #
-    "Ironsilk Gloves",
-    "Ironsilk Cap",
-    "Ironsilk Shoes",
-    "Ironsilk Pants",
-    "Ironsilk Robe",
-    #
-    "Drakehide Gauntlets",
     "Drakehide Helmet",
-    "Drakehide Boots",
     "Drakehide Breastplate",
+    "Drakehide Gauntlets",
     "Drakehide Leggings",
+    "Drakehide Boots",
+    #
+    "Willow Staff",
+    "Redwood Staff",
+    "Oak Staff",
+    "Ebony Staff",
+    "Katalox Staff",
+    #
+    "Force Shield",
+    "Tower Shield",
+    "Kite Shield",
+    "Buckler",
     #
     "Axe",
     "Scythe",
@@ -170,13 +171,13 @@ _TYPES = [
     "Mace",
 ]
 
-_SUFFIX_ARTICLES = [
+SUFFIX_ARTICLES = [
     "of the",
     "of",
     "the",
 ]
 
-_SUFFIXES = [
+SUFFIXES = [
     "Negation",
     "Protection",
     "Frost-born",
@@ -223,3 +224,76 @@ _SUFFIXES = [
     "Heimdall",
     "Surtr",
 ]
+
+SLOT_LOCS = dict(
+    HEAD=[
+        "Kevlar Helmet",
+        "Shade Helmet",
+        "Leather Helmet",
+        "Power Helmet",
+        "Plate Helmet",
+        "Reactive Helmet",
+        "Cotton Cap",
+        "Chain Helmet",
+        "Phase Cap",
+        "Ironsilk Cap",
+        "Gossamer Cap",
+        "Drakehide Helmet",
+    ],
+    BODY=[
+        "Kevlar Breastplate",
+        "Shade Breastplate",
+        "Leather Breastplate",
+        "Power Armor",
+        "Plate Cuirass",
+        "Reactive Cuirass",
+        "Cotton Robe",
+        "Chain Cuirass",
+        "Phase Robe",
+        "Ironsilk Robe",
+        "Gossamer Robe",
+        "Drakehide Breastplate",
+    ],
+    HANDS=[
+        "Kevlar Gauntlets",
+        "Shade Gauntlets",
+        "Leather Gauntlets",
+        "Power Gauntlets",
+        "Plate Gauntlets",
+        "Reactive Gauntlets",
+        "Cotton Gloves",
+        "Chain Gauntlets",
+        "Phase Gloves",
+        "Ironsilk Gloves",
+        "Gossamer Gloves",
+        "Drakehide Gauntlets",
+    ],
+    LEGS=[
+        "Kevlar Leggings",
+        "Shade Leggings",
+        "Leather Leggings",
+        "Power Leggings",
+        "Plate Greaves",
+        "Reactive Greaves",
+        "Cotton Pants",
+        "Chain Greaves",
+        "Phase Pants",
+        "Ironsilk Pants",
+        "Gossamer Pants",
+        "Drakehide Leggings",
+    ],
+    FEET=[
+        "Kevlar Boots",
+        "Shade Boots",
+        "Leather Boots",
+        "Power Boots",
+        "Plate Sabatons",
+        "Reactive Sabatons",
+        "Cotton Shoes",
+        "Chain Sabatons",
+        "Phase Shoes",
+        "Ironsilk Shoes",
+        "Gossamer Shoes",
+        "Drakehide Boots",
+    ],
+)

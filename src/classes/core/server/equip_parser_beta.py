@@ -59,20 +59,22 @@ def parse_equip_html(html: str) -> dict:
 
 def _parse_name(doc: BeautifulSoup) -> tuple[str, str | None]:
     fst_el = select_one_or_raise(doc, ".showequip > div")
-    name = _parse_name_el(fst_el)
-    return name, None
+    name, alt_name = _parse_name_el(fst_el)
+    return name, alt_name
 
 
 def _parse_name_el(el: Tag):
-    name = get_stripped_text(el)
+    children = get_children(el)
+    assert len(children) in [0, 2]
 
-    # Isekai update should've removed the "font" that used images for letters
-    # so name shouldnt be undefined anymore
-    # @todo: remove this check
-    if not name:
-        raise Exception("cant find name")
+    if len(children) == 0:
+        name = get_stripped_text(el)
+        alt_name = None
+    else:
+        name = get_stripped_text(children[1]).strip("()")
+        alt_name = get_stripped_text(children[0])
 
-    return name
+    return name, alt_name
 
 
 def _parse_equip_category(soup: BeautifulSoup) -> tuple[str, int | str, bool]:
