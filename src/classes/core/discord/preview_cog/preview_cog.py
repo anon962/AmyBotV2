@@ -33,6 +33,7 @@ from classes.core.discord.preview_cog.thread_preview import (
 )
 from config import logger
 from config.paths import CONFIG_DIR
+from utils.misc import download_image
 
 LOGGER = logger.bind(tags=["discord_bot"])
 
@@ -117,7 +118,7 @@ class PreviewCog(commands.Cog):
                 soup, url = r
                 thread = parse_thread(soup)
 
-                target = find_target_post(thread, m["pid"])
+                target: dict | None = find_target_post(thread, m["pid"])
                 if not target:
                     target = dict(
                         index=0,
@@ -145,14 +146,13 @@ class PreviewCog(commands.Cog):
                     m["pid"],
                 )
 
+                # Add thumbnail
                 embed = Embed(
                     title=title,
                     description=description,
                     url=url,
                 )
-
-                # Add thumbnail
-                file = None
+                files = []
                 if not auction_info:
                     thumbnail = await fetch_user_thumbnail(
                         target["post"]["author"]["uid"]
@@ -160,10 +160,28 @@ class PreviewCog(commands.Cog):
 
                     if thumbnail:
                         embed.set_thumbnail(url="attachment://image.png")
-                        file = _get_thumbnail_file(thumbnail["im"])
+                        files.append(_get_thumbnail_file(thumbnail["im"]))
 
                 # Send
-                await msg.channel.send(embed=embed, file=file)  # type: ignore
+                msg = await msg.channel.send(embed=embed, files=files)  # type: ignore
+
+                # Images from post body
+                im_files = []
+                ims = [
+                    im
+                    for im in await asyncio.gather(
+                        *[
+                            download_image(url)
+                            for url in target["post"]["img_urls"][:4]
+                        ],
+                        return_exceptions=True,
+                    )
+                ]
+                for im in ims:
+                    if isinstance(im, Image.Image):
+                        im_files.append(_get_thumbnail_file(im))
+                if im_files:
+                    await msg.channel.send(files=im_files)
 
             # Notify error
             if has_fail:

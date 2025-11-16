@@ -56,6 +56,7 @@ async def download_image(
     url: str,
     headers: dict[str, str] | None = None,
     chunk_size=8192,
+    max_size=10 * 1024**2,
 ) -> PILImage:
     buffer = bytearray()
     async with aiohttp.ClientSession() as session:
@@ -65,6 +66,8 @@ async def download_image(
 
         async for chunk in resp.content.iter_chunked(chunk_size):
             buffer += chunk
+            if len(buffer) > max_size:
+                raise ValueError()
 
     try:
         im = Image.open(io.BytesIO(buffer))

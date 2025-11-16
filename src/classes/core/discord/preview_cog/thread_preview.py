@@ -3,6 +3,7 @@ import re
 from typing import Any
 
 import aiohttp
+import bs4
 import loguru
 import tomli
 import yarl
@@ -16,7 +17,6 @@ from config import paths
 from config.paths import CONFIG_DIR
 from utils.html import (
     get_attr_or_raise,
-    get_children,
     get_self_text,
     get_stripped_text,
     get_tag,
@@ -88,10 +88,10 @@ def format_thread_preview(
     target_pid: int | None = None,
 ):
     config = tomli.loads((CONFIG_DIR / "preview_config.toml").read_text())
-    target = find_target_post(thread, target_pid)
+    target: dict | None = find_target_post(thread, target_pid)
     if not target:
         target = dict(
-            index=0,
+            index=thread["posts"][0]["index"],
             post=thread["posts"][0],
         )
 
@@ -103,18 +103,7 @@ def format_thread_preview(
     )
 
     sub_title = thread["description"]
-
-    body_parts = []
-    for p in target["post"]["body_parts"]:
-        if p["type"] in ["quotetop", "quotemain"]:
-            body_parts.append(f"[quote]...[/quote]")
-        elif p["type"] in ["edit", "img"]:
-            pass
-        elif p["text"].strip():
-            body_parts.append(p["text"].strip())
-
-    post_body = "\n".join(body_parts)
-    post_body = re.sub("\n\n", "\n", post_body)
+    post_body = target["post"]["body_text"]
     post_body = _truncate(
         post_body,
         length_mult * config["max_body_length"],
@@ -135,7 +124,7 @@ def format_thread_preview(
     else:
         footer = f"by [{author['name']}]({author_url})"
 
-    footer = f'#{target["index"] + 1} ' + footer
+    footer = f'#{target["index"]} ' + footer
 
     date = target["post"]["date"]
     footer += " | " + date.strftime(r"%Y-%m-%d")
@@ -234,38 +223,19 @@ def _parse_post(post_el: Tag) -> dict:
     author_url = yarl.URL(get_attr_or_raise(author_el, "href"))
     author_id = int(author_url.query.getone("showuser"))
 
-    body_parts = []
     body_el = select_one_or_raise(post_el, ".postcolor")
-    for child_el in body_el.contents:
-        part_type = None
-        if isinstance(child_el, Tag):
-            classes = child_el.get("class", [])
-            if "quotetop" in classes:
-                part_type = "quotetop"
-            elif "quotemain" in classes:
-                part_type = "quotemain"
-            elif "edit" in classes:
-                part_type = "edit"
-
-            if not part_type:
-                has_img = get_stripped_text(child_el).startswith("(IMG:")
-
-                grandchildren = get_children(child_el)
-                has_img |= any(
-                    get_tag(el) == "img" for el in [child_el, *grandchildren]
-                )
-
-                if has_img:
-                    part_type = "img"
-
-        part_type = part_type or "plaintext"
-
-        body_parts.append(
-            dict(
-                type=part_type,
-                text=get_stripped_text(child_el),
-            )
-        )
+    body_parts = _parse_body(body_el)
+    body_text = ""
+    img_urls = []
+    for p in body_parts:
+        if p.get("text"):
+            body_text += p["text"]
+        elif p.get("img"):
+            img_urls.append(p["img"])
+    body_text = re.sub(r" +", " ", body_text)
+    body_text = re.sub(r"\n\n+", "\n\n", body_text, flags=re.MULTILINE)
+    body_text = re.sub(r"\(IMG:.*?\)", "", body_text)
+    body_text = body_text.strip()
 
     post_index_el = select_one_or_raise(post_el, ".postdetails > a")
     post_index = int(
@@ -289,8 +259,53 @@ def _parse_post(post_el: Tag) -> dict:
             name=author_name,
             uid=author_id,
         ),
-        body_parts=body_parts,
+        body_text=body_text,
+        img_urls=img_urls,
     )
+
+
+def _parse_body(el: bs4.Tag | bs4.NavigableString | bs4.BeautifulSoup):
+    parts = []
+
+    if isinstance(el, bs4.Tag):
+        if get_tag(el) in ["div", "br"]:
+            parts.append(dict(text="\n"))
+        elif get_tag(el) in ["li"]:
+            parts.append(dict(text="\n- "))
+
+    children = el.children
+    if isinstance(children, (bs4.NavigableString, str)):
+        parts.append([dict(text=children.text)])
+        return parts
+
+    for child_el in children:
+        attrs = getattr(child_el, "attrs", dict())
+        classes = attrs.get("class", [])
+
+        if isinstance(child_el, bs4.NavigableString):
+            parts.append(dict(text=child_el.text))
+        elif "quotetop" in classes:
+            parts.append(dict(text="[quote]...[/quote]"))
+        elif "quotemain" in classes:
+            pass
+        elif "edit" in classes:
+            pass
+        elif get_tag(child_el) == "img":
+            if src := attrs.get("src"):
+                parts.append(dict(img=src))
+        elif get_tag(child_el) == "a":
+            parts.append(dict(text=child_el.text))
+
+            if any(
+                attrs.get("href", "").lower().endswith(ext) for ext in [".png", ".jpg"]
+            ):
+                parts.append(dict(img=attrs["href"]))
+            elif "act=Attach" in attrs.get("href", ""):
+                parts.append(dict(img=attrs["href"]))
+        else:
+            parts.extend(_parse_body(child_el))
+
+    return parts
 
 
 def _parse_date(date_text: str):
