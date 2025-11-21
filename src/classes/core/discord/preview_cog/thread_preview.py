@@ -124,7 +124,7 @@ def format_thread_preview(
     else:
         footer = f"by [{author['name']}]({author_url})"
 
-    footer = f'#{target["index"]} ' + footer
+    footer = f'#{target["post"]["index"] + 1} ' + footer
 
     date = target["post"]["date"]
     footer += " | " + date.strftime(r"%Y-%m-%d")
@@ -238,7 +238,7 @@ def _parse_post(post_el: Tag) -> dict:
     body_text = body_text.strip()
 
     post_index_el = select_one_or_raise(post_el, ".postdetails > a")
-    post_index = int(
+    post_index = -1 + int(
         search_or_raise(
             r"#(\d+)",
             get_stripped_text(post_index_el),
@@ -346,7 +346,7 @@ def _truncate(text: str, max_length: int, trailer="..."):
 
 def find_target_post(thread: dict, pid: int | None) -> dict[str, Any] | None:
     posts_by_pid: dict = {
-        p["pid"]: dict(index=idx, post=p) for idx, p in enumerate(thread["posts"])
+        p["pid"]: dict(page_index=idx, post=p) for idx, p in enumerate(thread["posts"])
     }
     target_post = posts_by_pid.get(pid, None)
     return target_post
